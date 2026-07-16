@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-display: 'Oswald', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  --color-graphite-950: #12181F;
+  --color-graphite-900: #1B232D;
+  --color-graphite-800: #263041;
+  --color-graphite-700: #3A4657;
+  --color-graphite-500: #6B7A8F;
+  --color-graphite-200: #DCE1E7;
+  --color-graphite-100: #EDF0F3;
+  --color-graphite-50: #F4F6F8;
+
+  --color-amber-signal: #E8862E;
+  --color-amber-signal-dark: #C96B1B;
+
+  --color-status-normal: #2E9E5B;
+  --color-status-normal-bg: #E6F5EC;
+  --color-status-warning: #E3A008;
+  --color-status-warning-bg: #FDF2DA;
+  --color-status-critical: #D6423C;
+  --color-status-critical-bg: #FBE7E6;
+  --color-status-unknown: #9AA5B1;
+  --color-status-unknown-bg: #EEF0F2;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--color-graphite-50);
+  color: var(--color-graphite-900);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Riveted panel-plate texture used behind the app shell header */
+.plate-texture {
+  background-image:
+    radial-gradient(circle at 12px 12px, rgba(255,255,255,0.05) 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--color-graphite-200); border-radius: 4px; }
