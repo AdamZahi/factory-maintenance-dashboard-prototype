@@ -3,12 +3,17 @@ import { format, parseISO } from 'date-fns'
 import { Card, CardHeader, Button } from './ui/Primitives'
 import { StatusBadge } from './ui/StatusBadge'
 import { EQUIPMENT_DEFINITIONS } from '../data/equipment'
+import { evaluateEquipment, worstStatus } from '../lib/validation'
+import { useInspections } from '../hooks/useData'
 import type { InspectionRecord, StatusLevel } from '../types'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp, Pencil, Save, X } from 'lucide-react'
 
 export function History({ inspections, onFilterChange }: { inspections: InspectionRecord[]; onFilterChange?: (f: FilterState) => void }) {
   const [filters, setFilters] = useState<FilterState>({ dateFrom: '', dateTo: '', equipmentId: 'all', status: 'all' })
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+  const [draftValues, setDraftValues] = useState<Record<string, string>>({})
+  const { save } = useInspections()
 
   const update = (patch: Partial<FilterState>) => {
     const next = { ...filters, ...patch }
@@ -28,6 +33,52 @@ export function History({ inspections, onFilterChange }: { inspections: Inspecti
       )
       .sort((a, b) => b.date.localeCompare(a.date))
   }, [inspections, filters])
+
+  const startEdit = (record: InspectionRecord, equipmentId: string) => {
+    const reading = record.equipmentReadings.find((eq) => eq.equipmentId === equipmentId)
+    const def = EQUIPMENT_DEFINITIONS.find((d) => d.id === equipmentId)
+    if (!reading || !def) return
+
+    const nextDraft: Record<string, string> = {}
+    for (const field of def.fields) {
+      const fieldReading = reading.fields.find((f) => f.fieldId === field.id)
+      nextDraft[field.id] = fieldReading?.value === null || fieldReading?.value === undefined ? '' : String(fieldReading.value)
+    }
+
+    setDraftValues(nextDraft)
+    setEditingKey(`${record.id}:${equipmentId}`)
+  }
+
+  const cancelEdit = () => {
+    setEditingKey(null)
+    setDraftValues({})
+  }
+
+  const saveEdit = (record: InspectionRecord, equipmentId: string) => {
+    const definition = EQUIPMENT_DEFINITIONS.find((d) => d.id === equipmentId)
+    if (!definition) return
+
+    const nextEquipmentReading = evaluateEquipment(
+      definition,
+      Object.fromEntries(definition.fields.map((field) => [field.id, draftValues[field.id] ?? null]))
+    )
+
+    const nextEquipmentReadings = record.equipmentReadings.map((reading) =>
+      reading.equipmentId === equipmentId ? nextEquipmentReading : reading
+    )
+
+    const nextOverallStatus = nextEquipmentReadings.reduce<StatusLevel>(
+      (acc, reading) => worstStatus(acc, reading.status === 'unknown' ? 'unknown' : reading.status),
+      'unknown'
+    )
+
+    save({
+      ...record,
+      equipmentReadings: nextEquipmentReadings,
+      overallStatus: nextOverallStatus === 'unknown' ? 'normal' : nextOverallStatus,
+    })
+    cancelEdit()
+  }
 
   return (
     <Card>
@@ -101,23 +152,60 @@ export function History({ inspections, onFilterChange }: { inspections: Inspecti
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {r.equipmentReadings.filter((eq) => eq.status !== 'unknown').map((eq) => {
                           const def = EQUIPMENT_DEFINITIONS.find((d) => d.id === eq.equipmentId)
+                          const editKey = `${r.id}:${eq.equipmentId}`
+                          const isEditing = editingKey === editKey
                           return (
                             <div key={eq.equipmentId} className="rounded-lg border border-[--color-graphite-200] bg-white p-3">
-                              <div className="mb-1 flex items-center justify-between">
+                              <div className="mb-2 flex items-center justify-between gap-3">
                                 <span className="text-xs font-semibold uppercase tracking-wide text-[--color-graphite-700]">{def?.name}</span>
-                                <StatusBadge status={eq.status} compact />
+                                <div className="flex items-center gap-2">
+                                  <StatusBadge status={eq.status} compact />
+                                  <Button size="sm" variant="ghost" onClick={() => (isEditing ? cancelEdit() : startEdit(r, eq.equipmentId))}>
+                                    {isEditing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+                                  </Button>
+                                </div>
                               </div>
-                              <ul className="space-y-0.5 text-xs text-[--color-graphite-500]">
-                                {eq.fields.filter((f) => f.value !== null && f.value !== '').map((f) => {
-                                  const fieldDef = def?.fields.find((fd) => fd.id === f.fieldId)
-                                  return (
-                                    <li key={f.fieldId} className="flex justify-between">
-                                      <span>{fieldDef?.label}</span>
-                                      <span className="font-mono text-[--color-graphite-900]">{f.value}{fieldDef?.unit ?? ''}</span>
-                                    </li>
-                                  )
-                                })}
-                              </ul>
+
+                              {isEditing ? (
+                                <div className="space-y-3">
+                                  <div className="grid grid-cols-1 gap-2">
+                                    {def?.fields.map((field) => (
+                                      <div key={field.id}>
+                                        <label className="mb-1 block text-[11px] font-medium text-[--color-graphite-500]">
+                                          {field.label}{field.unit ? ` (${field.unit})` : ''}
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={draftValues[field.id] ?? ''}
+                                          onChange={(e) => setDraftValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                                          className="w-full rounded-lg border border-[--color-graphite-200] px-3 py-2 text-sm font-mono focus:border-[--color-amber-signal] focus:outline-none"
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="flex justify-end gap-2">
+                                    <Button size="sm" className="bg-gray-500 hover:bg-gray-700 text-white cursor-pointer" variant="ghost" onClick={cancelEdit}>
+                                      Annuler
+                                    </Button>
+                                    <Button size="sm" className="bg-green-500 hover:bg-green-700 cursor-pointer" variant="primary" onClick={() => saveEdit(r, eq.equipmentId)}>
+                                      <Save className="h-3.5 w-3.5" />
+                                      Enregistrer
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <ul className="space-y-0.5 text-xs text-[--color-graphite-500]">
+                                  {eq.fields.filter((f) => f.value !== null && f.value !== '').map((f) => {
+                                    const fieldDef = def?.fields.find((fd) => fd.id === f.fieldId)
+                                    return (
+                                      <li key={f.fieldId} className="flex justify-between">
+                                        <span>{fieldDef?.label}</span>
+                                        <span className="font-mono text-[--color-graphite-900]">{f.value}{fieldDef?.unit ?? ''}</span>
+                                      </li>
+                                    )
+                                  })}
+                                </ul>
+                              )}
                             </div>
                           )
                         })}
