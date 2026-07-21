@@ -30,7 +30,10 @@
 
 body {
   font-family: var(--font-body);
-  background: var(--color-graphite-50);
+  background:
+    radial-gradient(circle at top left, rgba(232, 134, 46, 0.08), transparent 28%),
+    radial-gradient(circle at top right, rgba(46, 158, 91, 0.06), transparent 30%),
+    linear-gradient(180deg, #eceff3 0%, #f6f7f9 36%, #eef1f4 100%);
   color: var(--color-graphite-900);
 }
 
@@ -45,8 +48,37 @@ body {
 /* Riveted panel-plate texture used behind the app shell header */
 .plate-texture {
   background-image:
-    radial-gradient(circle at 12px 12px, rgba(255,255,255,0.05) 1.5px, transparent 1.5px);
+    radial-gradient(circle at 12px 12px, rgba(255,255,255,0.05) 1.5px, transparent 1.5px),
+    linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0));
   background-size: 24px 24px;
+}
+
+.app-frame {
+  box-shadow: 0 24px 80px rgba(18, 24, 31, 0.12);
+}
+
+.chart-shadow {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-count-up {
+  animation: count-up 360ms ease-out;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, rgba(220,225,231,0.65) 25%, rgba(244,246,248,0.95) 50%, rgba(220,225,231,0.65) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
 }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
