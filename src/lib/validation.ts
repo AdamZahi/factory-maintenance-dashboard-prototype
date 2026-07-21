@@ -68,6 +68,20 @@ function applyRule(rule: ValidationRule, value: number): { status: StatusLevel; 
     return { status: 'normal' }
   }
 
+  if (rule.greaterThan !== undefined) {
+    if (value > rule.greaterThan) {
+      return { status: 'warning', message: `Supérieur à ${rule.greaterThan}${rule.unit ?? ''}` }
+    }
+    return { status: 'normal' }
+  }
+
+  if (rule.lessThan !== undefined) {
+    if (value < rule.lessThan) {
+      return { status: 'warning', message: `Inférieur à ${rule.lessThan}${rule.unit ?? ''}` }
+    }
+    return { status: 'normal' }
+  }
+
   if (rule.min !== undefined || rule.max !== undefined) {
     const min = rule.min ?? -Infinity
     const max = rule.max ?? Infinity

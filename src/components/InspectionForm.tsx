@@ -153,11 +153,13 @@ export function InspectionForm({ technicianId }: { technicianId: string | null }
   )
 }
 
-function ruleHint(field: { rule?: { min?: number; max?: number; equals?: number; thresholdBelow?: number } }): string {
+function ruleHint(field: { rule?: { min?: number; max?: number; equals?: number; thresholdBelow?: number; thresholdAbove?: number; greaterThan?: number; lessThan?: number } }): string {
   const r = field.rule
   if (!r) return '—'
   if (r.equals !== undefined) return `= ${r.equals}`
   if (r.thresholdBelow !== undefined) return `> ${r.thresholdBelow}`
+  if (r.greaterThan !== undefined) return `> ${r.greaterThan}`
+  if (r.lessThan !== undefined) return `< ${r.lessThan}`
   if (r.min !== undefined && r.max !== undefined) return `${r.min} – ${r.max}`
   if (r.max !== undefined) return `≤ ${r.max}`
   return '—'

@@ -26,6 +26,8 @@ export interface ValidationRule {
   /** Value at/below (fuel) or at/above (hours) this triggers a warning, not a hard bound */
   thresholdBelow?: number
   thresholdAbove?: number
+  greaterThan?: number
+  lessThan?: number
   unit?: string
 }
 

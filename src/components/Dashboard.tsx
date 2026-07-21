@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
   LineChart, Line, XAxis, YAxis, CartesianGrid,
-  AreaChart, Area, BarChart, Bar, ReferenceDot,
+  AreaChart, Area, ReferenceDot,
 } from 'recharts'
 import { format, parseISO, subDays } from 'date-fns'
 import { Card, CardHeader } from './ui/Primitives'
@@ -177,17 +177,6 @@ export function Dashboard({
       if (r.overallStatus === 'normal') entry.normal += 1
       if (r.overallStatus === 'warning') entry.warning += 1
       if (r.overallStatus === 'critical') entry.critical += 1
-      byDate.set(r.date, entry)
-    }
-    return Array.from(byDate.values())
-  }, [inspections])
-
-  const comparisonByDay = useMemo(() => {
-    const byDate = new Map<string, { date: string; label: string; normal: number; anomaly: number }>()
-    for (const r of [...inspections].sort((a, b) => a.date.localeCompare(b.date))) {
-      const entry = byDate.get(r.date) ?? { date: r.date, label: format(parseISO(r.date), 'dd/MM'), normal: 0, anomaly: 0 }
-      if (r.overallStatus === 'normal') entry.normal += 1
-      else entry.anomaly += 1
       byDate.set(r.date, entry)
     }
     return Array.from(byDate.values())
@@ -376,30 +365,6 @@ export function Dashboard({
                     </div>
                   </div>
                 </>
-              )}
-            </div>
-          </Card>
-
-          <Card>
-            <CardHeader title="Daily comparison" subtitle="Normal vs anomalies" />
-            <div className="h-88 p-5 pt-4 chart-shadow">
-              {comparisonByDay.length === 0 ? (
-                <EmptyState />
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={comparisonByDay} barGap={8}>
-                    <CartesianGrid strokeDasharray="4 4" stroke="#EDF0F3" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="#6B7A8F" axisLine={false} tickLine={false} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="#6B7A8F" axisLine={false} tickLine={false} />
-                    <Tooltip
-                      contentStyle={{ borderRadius: 18, border: '1px solid #DCE1E7', boxShadow: '0 12px 32px rgba(18,24,31,0.12)' }}
-                      formatter={(value, name) => [value, name]}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="normal" name="Normal" fill={statusColor('normal')} radius={[8, 8, 0, 0]} />
-                    <Bar dataKey="anomaly" name="Anomalies" fill={statusColor('warning')} radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
               )}
             </div>
           </Card>

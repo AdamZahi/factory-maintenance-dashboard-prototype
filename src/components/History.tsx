@@ -13,7 +13,7 @@ export function History({ inspections, onFilterChange }: { inspections: Inspecti
   const [expanded, setExpanded] = useState<string | null>(null)
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [draftValues, setDraftValues] = useState<Record<string, string>>({})
-  const { save } = useInspections()
+  const { save, remove } = useInspections()
 
   const update = (patch: Partial<FilterState>) => {
     const next = { ...filters, ...patch }
@@ -52,6 +52,21 @@ export function History({ inspections, onFilterChange }: { inspections: Inspecti
   const cancelEdit = () => {
     setEditingKey(null)
     setDraftValues({})
+  }
+
+  const deleteInspection = (record: InspectionRecord) => {
+    const confirmed = window.confirm(
+      `Supprimer l’inspection du ${format(parseISO(record.date), 'dd/MM/yyyy')} ? Cette action supprimera toute la journée et ne peut pas être annulée.`
+    )
+    if (!confirmed) return
+
+    if (editingKey?.startsWith(`${record.id}:`)) {
+      cancelEdit()
+    }
+    if (expanded === record.id) {
+      setExpanded(null)
+    }
+    remove(record.id)
   }
 
   const saveEdit = (record: InspectionRecord, equipmentId: string) => {
@@ -149,6 +164,11 @@ export function History({ inspections, onFilterChange }: { inspections: Inspecti
                 {expanded === r.id && (
                   <tr className="border-b border-[--color-graphite-100] bg-[--color-graphite-50]/60">
                     <td colSpan={4} className="px-5 py-4">
+                      <div className="mb-4 flex items-center justify-end">
+                        <Button size="sm" className='bg-red-600' variant="danger" onClick={() => deleteInspection(r)}>
+                          Supprimer la journée
+                        </Button>
+                      </div>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {r.equipmentReadings.filter((eq) => eq.status !== 'unknown').map((eq) => {
                           const def = EQUIPMENT_DEFINITIONS.find((d) => d.id === eq.equipmentId)
@@ -160,7 +180,7 @@ export function History({ inspections, onFilterChange }: { inspections: Inspecti
                                 <span className="text-xs font-semibold uppercase tracking-wide text-[--color-graphite-700]">{def?.name}</span>
                                 <div className="flex items-center gap-2">
                                   <StatusBadge status={eq.status} compact />
-                                  <Button size="sm" variant="ghost" onClick={() => (isEditing ? cancelEdit() : startEdit(r, eq.equipmentId))}>
+                                  <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); isEditing ? cancelEdit() : startEdit(r, eq.equipmentId) }}>
                                     {isEditing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
                                   </Button>
                                 </div>
@@ -184,10 +204,10 @@ export function History({ inspections, onFilterChange }: { inspections: Inspecti
                                     ))}
                                   </div>
                                   <div className="flex justify-end gap-2">
-                                    <Button size="sm" className="bg-gray-500 hover:bg-gray-700 text-white cursor-pointer" variant="ghost" onClick={cancelEdit}>
+                                    <Button size="sm" className="bg-gray-500 hover:bg-gray-700 text-white cursor-pointer" variant="ghost" onClick={(event) => { event.stopPropagation(); cancelEdit() }}>
                                       Annuler
                                     </Button>
-                                    <Button size="sm" className="bg-green-500 hover:bg-green-700 cursor-pointer" variant="primary" onClick={() => saveEdit(r, eq.equipmentId)}>
+                                    <Button size="sm" className="bg-green-500 hover:bg-green-700 cursor-pointer" variant="primary" onClick={(event) => { event.stopPropagation(); saveEdit(r, eq.equipmentId) }}>
                                       <Save className="h-3.5 w-3.5" />
                                       Enregistrer
                                     </Button>

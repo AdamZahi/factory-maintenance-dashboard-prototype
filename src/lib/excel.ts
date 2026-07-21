@@ -28,34 +28,41 @@ const CELL_MAP: CellMapEntry[] = [
   { equipmentId: 'chaudiere', fieldId: 'niveau_peche_adoucie', row: 9 },
   { equipmentId: 'groupe_electrogene', fieldId: 'batterie', row: 10 },
   { equipmentId: 'groupe_electrogene', fieldId: 'niveau_carburant', row: 11 },
-  { equipmentId: 'surpresseur_eau', fieldId: 'niveau_peche_eau', row: 12 },
-  { equipmentId: 'surpresseur_eau', fieldId: 'pression', row: 13 },
-  { equipmentId: 'compresseur', fieldId: 'compteur', row: 14 },
-  { equipmentId: 'compresseur', fieldId: 'temperature', row: 15 },
-  { equipmentId: 'compresseur', fieldId: 'pression', row: 16 },
-  { equipmentId: 'local_carburant', fieldId: 'niveau_mazout', row: 17 },
-  { equipmentId: 'chariot_elevateur', fieldId: 'compteur', row: 18 },
-  { equipmentId: 'consommation_eau', fieldId: 'compteur', row: 19 },
-  { equipmentId: 'tgbt_1', fieldId: 'tension', row: 20 },
-  { equipmentId: 'tgbt_1', fieldId: 'courant', row: 21 },
-  { equipmentId: 'tgbt_1', fieldId: 'cos_phi', row: 22 },
-  { equipmentId: 'tgbt_1', fieldId: 'terre', row: 23 },
-  { equipmentId: 'tgbt_2', fieldId: 'tension', row: 24 },
-  { equipmentId: 'tgbt_2', fieldId: 'courant', row: 25 },
-  { equipmentId: 'tgbt_2', fieldId: 'cos_phi', row: 26 },
-  { equipmentId: 'tgbt_2', fieldId: 'terre', row: 27 },
+  { equipmentId: 'groupe_electrogene', fieldId: 'compteur', row: 12 },
+  { equipmentId: 'groupe_electrogene', fieldId: 'nombre_start', row: 13 },
+  { equipmentId: 'surpresseur_eau', fieldId: 'niveau_peche_eau', row: 14 },
+  { equipmentId: 'surpresseur_eau', fieldId: 'pression', row: 15 },
+  { equipmentId: 'compresseur', fieldId: 'compteur', row: 16 },
+  { equipmentId: 'compresseur', fieldId: 'temperature', row: 17 },
+  { equipmentId: 'compresseur', fieldId: 'temperateur_local', row: 18 },
+  { equipmentId: 'compresseur', fieldId: 'pression', row: 19 },
+  { equipmentId: 'local_carburant', fieldId: 'niveau_mazout', row: 20 },
+  { equipmentId: 'chariot_elevateur', fieldId: 'compteur', row: 21 },
+  { equipmentId: 'consommation_eau', fieldId: 'compteur', row: 22 },
+  { equipmentId: 'tgbt_1', fieldId: 'tension_ph1', row: 23 },
+  { equipmentId: 'tgbt_1', fieldId: 'tension_ph2', row: 24 },
+  { equipmentId: 'tgbt_1', fieldId: 'tension_ph3', row: 25 },
+  { equipmentId: 'tgbt_1', fieldId: 'courant', row: 26 },
+  { equipmentId: 'tgbt_1', fieldId: 'cos_phi', row: 27 },
+  { equipmentId: 'tgbt_1', fieldId: 'terre', row: 28 },
+  { equipmentId: 'tgbt_2', fieldId: 'tension_ph1', row: 29 },
+  { equipmentId: 'tgbt_2', fieldId: 'tension_ph2', row: 30 },
+  { equipmentId: 'tgbt_2', fieldId: 'tension_ph3', row: 31 },
+  { equipmentId: 'tgbt_2', fieldId: 'courant', row: 32 },
+  { equipmentId: 'tgbt_2', fieldId: 'cos_phi', row: 33 },
+  { equipmentId: 'tgbt_2', fieldId: 'terre', row: 34 },
 ]
 
 const EQUIPMENT_LABEL_ROWS: { equipmentId: string; row: number; name: string }[] = [
   { equipmentId: 'chaudiere', row: 5, name: 'Chaudière' },
   { equipmentId: 'groupe_electrogene', row: 10, name: 'Groupe électrogène' },
-  { equipmentId: 'surpresseur_eau', row: 12, name: "Surpresseur d'eau" },
-  { equipmentId: 'compresseur', row: 14, name: 'Compresseur' },
-  { equipmentId: 'local_carburant', row: 17, name: ' Local   carburant' },
-  { equipmentId: 'chariot_elevateur', row: 18, name: 'Chariot élévateur' },
-  { equipmentId: 'consommation_eau', row: 19, name: "consommation d'eau" },
-  { equipmentId: 'tgbt_1', row: 20, name: 'TGBT "1"' },
-  { equipmentId: 'tgbt_2', row: 24, name: 'TGBT "2"' },
+  { equipmentId: 'surpresseur_eau', row: 14, name: "Surpresseur d'eau" },
+  { equipmentId: 'compresseur', row: 16, name: 'Compresseur' },
+  { equipmentId: 'local_carburant', row: 20, name: ' Local   carburant' },
+  { equipmentId: 'chariot_elevateur', row: 21, name: 'Chariot élévateur' },
+  { equipmentId: 'consommation_eau', row: 22, name: "consommation d'eau" },
+  { equipmentId: 'tgbt_1', row: 23, name: 'TGBT "1"' },
+  { equipmentId: 'tgbt_2', row: 29, name: 'TGBT "2"' },
 ]
 
 // Columns C..H = the 6 working days, Mon(0)..Sat(5)
@@ -84,7 +91,7 @@ export function exportWeekToWorkbook(records: InspectionRecord[], options: Expor
   const weekEnd = addDays(weekStart, 5)
   const recordsByDate = new Map(records.map((r) => [r.date, r]))
 
-  const aoa: (string | number)[][] = Array.from({ length: 31 }, () => Array(11).fill(''))
+  const aoa: (string | number)[][] = Array.from({ length: 38 }, () => Array(11).fill(''))
 
   const setCell = (row: number, col: string, value: string | number) => {
     const colIdx = XLSX.utils.decode_col(col)
@@ -124,20 +131,20 @@ export function exportWeekToWorkbook(records: InspectionRecord[], options: Expor
     else if (weekStatus === 'critical') setCell(entry.row, 'K', 'X')
   }
 
-  setCell(28, 'A', 'TH=0 . PH=10,5 à 12 . sulfite=30à100 / Batterie = 26,4 à 27,9 /  Pression = 5bar / Compteur: 2000H . T°=  Entre 75°C et 90 °C... Pression=7bar  /  Niveau  mazout = Réservoir de 500 L à remplir')
-  setCell(29, 'A', 'Entretien toutes les 250 heures  /  TGBT=tension : Entre 190V et 260V... Cos Phi: Entre  0,8 et 1... Terre = Plus proche de 0 Ω = meilleure qualité "maximum de 10 Ω"')
-  setCell(30, 'A', options.controlledBy ?? '')
-  setCell(30, 'C', 'Temp. (°C) - Pression (bar) - Tension (V) - Courant (A)- Terre (Ω) - Cos φ - Compteur (h) - Volume(m³) - TH (°f) - Sulfite (mg/L)')
-  setCell(31, 'A', 'Coordinateur technique Maintenace et infrastructure')
-  setCell(31, 'C', 'Contrôlé par : ____________________________________')
-  setCell(31, 'F', 'Signature : ____________________')
+  setCell(35, 'A', 'TH=0 . PH=10,5 à 12 . sulfite=30 à 100 mg/L . Niveau bâche brut >= 10 / Batterie = 26,4 à 27,9 / Niveau carburant >= 200L / Niveau bâche eau >= 20')
+  setCell(36, 'A', 'Compresseur: température locale > 23°C / Consommation eau: compteur > 10m³ / TGBT: tension Ph1-Ph3 entre 180V et 250V / Terre = maximum de 10 Ω')
+  setCell(37, 'A', options.controlledBy ?? '')
+  setCell(37, 'C', 'Temp. (°C) - Pression (bar) - Tension Ph1/Ph2/Ph3 (V) - Courant (A) - Terre (Ω) - Cos φ - Compteur (h) - Nombre de start - Volume(m³) - TH (°f) - Sulfite (mg/L)')
+  setCell(38, 'A', 'Coordinateur technique Maintenance et infrastructure')
+  setCell(38, 'C', 'Contrôlé par : ____________________________________')
+  setCell(38, 'F', 'Signature : ____________________')
 
   const ws = XLSX.utils.aoa_to_sheet(aoa)
   ws['!merges'] = [
     'A1:K2', 'A3:C3', 'D3:E3', 'F3:G3', 'I3:K3',
     'A5:A9', 'A10:A11', 'A12:A13', 'A14:A16', 'A17:A17',
     'A20:A23', 'A24:A27',
-    'A28:K28', 'A29:K29', 'A30:B30', 'C30:K30', 'A31:B31', 'C31:E31', 'H31:I31',
+    'A35:K35', 'A36:K36', 'A37:B37', 'C37:K37', 'A38:B38', 'C38:E38', 'H38:I38',
   ].map((r) => XLSX.utils.decode_range(r))
   ws['!cols'] = [
     { wch: 20 }, { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 14 },

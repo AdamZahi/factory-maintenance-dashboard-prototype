@@ -30,10 +30,7 @@
 
 body {
   font-family: var(--font-body);
-  background:
-    radial-gradient(circle at top left, rgba(232, 134, 46, 0.08), transparent 28%),
-    radial-gradient(circle at top right, rgba(46, 158, 91, 0.06), transparent 30%),
-    linear-gradient(180deg, #eceff3 0%, #f6f7f9 36%, #eef1f4 100%);
+  background: #ffffff;
   color: var(--color-graphite-900);
 }
 

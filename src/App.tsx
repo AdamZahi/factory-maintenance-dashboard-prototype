@@ -44,9 +44,9 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#e7eaee_0%,#eff2f5_30%,#e7eaee_100%)] p-4 md:p-6">
-      <div className="app-frame mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1580px] overflow-hidden rounded-4xl border border-white/70 bg-white/90 backdrop-blur-sm md:min-h-[calc(100vh-3rem)]">
-        <aside className="flex w-70 flex-col border-r border-[--color-graphite-100] bg-white px-4 py-5">
+    <div className="min-h-screen bg-white">
+      <div className="flex min-h-screen">
+        <aside className="flex h-screen w-70 flex-col border-r border-[--color-graphite-100] bg-white px-4 py-5">
           <div className="flex items-center gap-3 rounded-2xl bg-[--color-graphite-50] px-4 py-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[--color-amber-signal] text-black shadow-sm">
               <Factory className="h-5 w-5" />
@@ -95,7 +95,7 @@ export default function App() {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col bg-[--color-graphite-50]">
-          <header className="border-b border-[--color-graphite-100] bg-white/80 px-6 py-5 backdrop-blur-sm">
+          <header className="border-b border-[--color-graphite-100] bg-white px-6 py-5">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.18em] text-[--color-graphite-500]">{activeTitle}</p>
@@ -147,7 +147,7 @@ export default function App() {
             {tab === 'excel' && <ImportExport />}
           </main>
 
-          <footer className="border-t border-[--color-graphite-100] bg-white/80 px-6 py-4 text-center text-xs text-[--color-graphite-500]">
+          <footer className="border-t border-[--color-graphite-100] bg-white px-6 py-4 text-center text-xs text-[--color-graphite-500]">
             Démonstrateur frontend — données stockées localement dans ce navigateur (localStorage). Aucune donnée n'est envoyée à un serveur.
           </footer>
         </div>
