@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  TECHNICIAN
+}
+
+model User {
+  id          String               @id
+  email       String               @unique
+  name        String
+  role        Role                 @default(TECHNICIAN)
+  createdAt   DateTime             @default(now())
+  assignments EquipmentAssignment[]
+  inspections Inspection[]
+}
+
+model Equipment {
+  id          String               @id
+  name        String
+  assignments EquipmentAssignment[]
+  readings    EquipmentReading[]
+}
+
+model EquipmentAssignment {
+  id           String    @id @default(cuid())
+  technician   User      @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  technicianId String
+  equipment    Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  equipmentId  String
+  assignedBy   String
+  assignedAt   DateTime  @default(now())
+
+  @@unique([technicianId, equipmentId])
+  @@index([technicianId])
+  @@index([equipmentId])
+}
+
+model Inspection {
+  id            String            @id @default(cuid())
+  date          DateTime
+  technician    User              @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  technicianId  String
+  overallStatus String
+  createdAt     DateTime          @default(now())
+  readings      EquipmentReading[]
+
+  @@index([technicianId])
+  @@index([date])
+}
+
+model EquipmentReading {
+  id           String     @id @default(cuid())
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  inspectionId String
+  equipment    Equipment  @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  equipmentId  String
+  status       String
+  fields       Json
+
+  @@index([inspectionId])
+  @@index([equipmentId])
+}
