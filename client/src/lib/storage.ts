@@ -86,3 +86,115 @@ export const STORAGE_KEYS = {
 export function generateId(prefix = 'id'): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
 }
+
+// ---------------------------------------------------------------------------
+// API-backed repository
+//
+// Same `Repository<T>` interface, but data lives in the backend instead of
+// localStorage. Because the interface is synchronous (getAll(): T[]) and HTTP
+// is not, each repo keeps an in-memory cache: getAll() returns the cache
+// immediately, and a background fetch refreshes it and fires notify() -> the
+// existing useRepository subscription re-renders with fresh data. Writes update
+// the cache optimistically, then POST/DELETE and re-sync.
+// ---------------------------------------------------------------------------
+
+const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replace(/\/$/, '')
+
+type TokenGetter = () => Promise<string | null>
+
+// Clerk's getToken() is only available inside React, so App registers it here
+// at startup; repositories created at module load read it lazily per request.
+let getAuthToken: TokenGetter = async () => null
+export function setAuthTokenGetter(fn: TokenGetter) {
+  getAuthToken = fn
+}
+
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = await getAuthToken()
+  const res = await fetch(`${API_URL}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init?.headers ?? {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText)
+    throw new Error(`API ${init?.method ?? 'GET'} ${path} -> ${res.status}: ${detail}`)
+  }
+  if (res.status === 204) return undefined as T
+  return (await res.json()) as T
+}
+
+export function createApiRepository<T extends { id: string }>(basePath: string): Repository<T> {
+  let cache: T[] = []
+  let loaded = false
+  const listeners = new Set<() => void>()
+  const emit = () => listeners.forEach((cb) => cb())
+
+  const refresh = async () => {
+    try {
+      cache = await apiFetch<T[]>(basePath)
+      loaded = true
+      emit()
+    } catch (err) {
+      console.error(`[api] refresh "${basePath}" failed`, err)
+    }
+  }
+
+  const upsertLocal = (item: T) => {
+    const idx = cache.findIndex((i) => i.id === item.id)
+    if (idx >= 0) cache = cache.map((i) => (i.id === item.id ? item : i))
+    else cache = [item, ...cache]
+  }
+
+  return {
+    getAll: () => cache,
+    getById: (id) => cache.find((i) => i.id === id),
+    save: (item) => {
+      upsertLocal(item) // optimistic
+      emit()
+      apiFetch<T>(basePath, { method: 'POST', body: JSON.stringify(item) })
+        .then((saved) => {
+          if (saved) upsertLocal(saved)
+          return refresh()
+        })
+        .catch((err) => {
+          console.error(err)
+          refresh()
+        })
+      return item
+    },
+    saveMany: (items) => {
+      items.forEach(upsertLocal) // optimistic
+      emit()
+      apiFetch<T[]>(`${basePath}/batch`, { method: 'POST', body: JSON.stringify(items) })
+        .then(() => refresh())
+        .catch((err) => {
+          console.error(err)
+          refresh()
+        })
+      return items
+    },
+    remove: (id) => {
+      cache = cache.filter((i) => i.id !== id) // optimistic
+      emit()
+      apiFetch(`${basePath}/${id}`, { method: 'DELETE' }).catch((err) => {
+        console.error(err)
+        refresh()
+      })
+    },
+    clear: () => {
+      cache = []
+      emit()
+    },
+    subscribe: (listener) => {
+      listeners.add(listener)
+      if (!loaded) void refresh() // kick off the first load when a component mounts
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+  }
+}

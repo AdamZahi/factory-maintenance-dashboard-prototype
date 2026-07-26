@@ -1,34 +1,41 @@
 import { useMemo, useState } from 'react'
 import { format } from 'date-fns'
+import { useUser } from '@clerk/clerk-react'
 import { Card, CardHeader, Button, Badge } from './ui/Primitives'
 import { StatusBadge } from './ui/StatusBadge'
 import { EQUIPMENT_DEFINITIONS } from '../data/equipment'
 import { evaluateEquipment, worstStatus } from '../lib/validation'
-import { useInspections, useTechnicians } from '../hooks/useData'
+import { useInspections, useAssignments } from '../hooks/useData'
 import { generateId } from '../lib/storage'
 import type { StatusLevel } from '../types'
-import { ClipboardCheck, AlertTriangle } from 'lucide-react'
+import { ClipboardCheck, AlertTriangle, Lock } from 'lucide-react'
 
 type ValuesState = Record<string, Record<string, string>>
 
-export function InspectionForm({ technicianId }: { technicianId: string | null }) {
-  const { items: technicians } = useTechnicians()
+export function InspectionForm({ role }: { role: 'admin' | 'technician' }) {
+  const { user } = useUser()
   const { save } = useInspections()
+  // Technicians only see equipment they're assigned to; admins see everything.
+  const { assignments, loading: assignmentsLoading } = useAssignments(role === 'admin' ? undefined : 'me')
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [values, setValues] = useState<ValuesState>({})
   const [saved, setSaved] = useState(false)
 
-  const technician = technicians.find((t) => t.id === technicianId)
+  const visibleDefinitions = useMemo(() => {
+    if (role === 'admin') return EQUIPMENT_DEFINITIONS
+    const assignedIds = new Set(assignments.map((a) => a.equipmentId))
+    return EQUIPMENT_DEFINITIONS.filter((def) => assignedIds.has(def.id))
+  }, [role, assignments])
 
   const readings = useMemo(
     () =>
-      EQUIPMENT_DEFINITIONS.map((def) =>
+      visibleDefinitions.map((def) =>
         evaluateEquipment(
           def,
           Object.fromEntries(def.fields.map((f) => [f.id, values[def.id]?.[f.id] ?? null]))
         )
       ),
-    [values]
+    [visibleDefinitions, values]
   )
 
   const overallStatus: StatusLevel = readings.reduce<StatusLevel>(
@@ -47,8 +54,10 @@ export function InspectionForm({ technicianId }: { technicianId: string | null }
     save({
       id: generateId('insp'),
       date,
-      technicianId: technician?.id ?? 'unassigned',
-      technicianName: technician?.name ?? 'Technicien non renseigné',
+      // The backend attributes the inspection to the signed-in user; these are
+      // sent for completeness / optimistic display.
+      technicianId: user?.id ?? 'unassigned',
+      technicianName: user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? 'Technicien',
       usine: 'SBM Tunisie',
       equipmentReadings: readings,
       overallStatus: overallStatus === 'unknown' ? 'normal' : overallStatus,
@@ -58,12 +67,26 @@ export function InspectionForm({ technicianId }: { technicianId: string | null }
     setSaved(true)
   }
 
+  if (role === 'technician' && !assignmentsLoading && visibleDefinitions.length === 0) {
+    return (
+      <Card>
+        <div className="flex flex-col items-center gap-2 p-10 text-center">
+          <Lock className="h-6 w-6 text-[--color-graphite-400]" />
+          <p className="text-sm font-medium text-[--color-graphite-700]">Aucun équipement ne vous est affecté</p>
+          <p className="text-xs text-[--color-graphite-500]">
+            Contactez un administrateur pour qu'il vous affecte des équipements à inspecter.
+          </p>
+        </div>
+      </Card>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader
           title="Inspection du jour"
-          subtitle={technician ? `Technicien : ${technician.name}` : 'Technicien facultatif'}
+          subtitle={user?.fullName ? `Technicien : ${user.fullName}` : 'Inspection du jour'}
           action={
             <div className="flex items-center gap-3">
               <input
@@ -86,7 +109,7 @@ export function InspectionForm({ technicianId }: { technicianId: string | null }
       </Card>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {EQUIPMENT_DEFINITIONS.map((def, idx) => {
+        {visibleDefinitions.map((def, idx) => {
           const reading = readings[idx]
           return (
             <Card key={def.id}>

@@ -1,25 +1,57 @@
-import { useState } from 'react'
-import { TechnicianForm } from './components/TechnicianForm'
+import { useEffect, useState } from 'react'
+import { SignedIn, SignedOut, SignIn, UserButton, useAuth, useUser, useClerk } from '@clerk/clerk-react'
 import { InspectionForm } from './components/InspectionForm'
 import { Dashboard } from './components/Dashboard'
 import { History } from './components/History'
 import { ImportExport } from './components/ImportExport'
 import { EquipmentParametersDetails } from './components/EquipmentParametersDetails'
+import { AdminAssignments } from './components/AdminAssignments'
 import { useInspections } from './hooks/useData'
-import { LayoutDashboard, ClipboardList, History as HistoryIcon, FileSpreadsheet, Factory, Search, Bell, ChevronDown, LifeBuoy, LogOut } from 'lucide-react'
+import { setAuthTokenGetter } from './lib/storage'
+import { LayoutDashboard, ClipboardList, History as HistoryIcon, FileSpreadsheet, Factory, Search, Bell, LifeBuoy, LogOut, Users } from 'lucide-react'
 
-type Tab = 'dashboard' | 'inspection' | 'history' | 'excel'
+type Tab = 'dashboard' | 'inspection' | 'history' | 'excel' | 'assignments'
+type Role = 'admin' | 'technician'
 
-const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+const ALL_TABS: { id: Tab; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
   { id: 'dashboard', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" /> },
   { id: 'inspection', label: 'Inspection du jour', icon: <ClipboardList className="h-4 w-4" /> },
   { id: 'history', label: 'Historique', icon: <HistoryIcon className="h-4 w-4" /> },
-  { id: 'excel', label: 'Import / Export', icon: <FileSpreadsheet className="h-4 w-4" /> },
+  { id: 'excel', label: 'Import / Export', icon: <FileSpreadsheet className="h-4 w-4" />, adminOnly: true },
+  { id: 'assignments', label: 'Affectations', icon: <Users className="h-4 w-4" />, adminOnly: true },
 ]
 
+/** Bridges Clerk's getToken() into the storage layer so API calls are authenticated. */
+function useAuthTokenBridge() {
+  const { getToken } = useAuth()
+  useEffect(() => {
+    setAuthTokenGetter(() => getToken())
+  }, [getToken])
+}
+
 export default function App() {
+  return (
+    <>
+      <SignedOut>
+        <div className="flex min-h-screen items-center justify-center bg-[--color-graphite-50] p-6">
+          <SignIn />
+        </div>
+      </SignedOut>
+      <SignedIn>
+        <AuthenticatedApp />
+      </SignedIn>
+    </>
+  )
+}
+
+function AuthenticatedApp() {
+  useAuthTokenBridge()
+  const { user } = useUser()
+  const { signOut } = useClerk()
+  const role: Role = (user?.publicMetadata?.role as string | undefined) === 'admin' ? 'admin' : 'technician'
+  const tabs = ALL_TABS.filter((t) => !t.adminOnly || role === 'admin')
+
   const [tab, setTab] = useState<Tab>('dashboard')
-  const [technicianId, setTechnicianId] = useState<string | null>(null)
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null)
   const { items: inspections } = useInspections()
 
@@ -31,7 +63,9 @@ export default function App() {
         ? 'Inspection du jour'
         : tab === 'history'
           ? 'Historique'
-          : 'Import / Export'
+          : tab === 'assignments'
+            ? 'Affectations'
+            : 'Import / Export'
 
   const openEquipmentDetails = (equipmentId: string) => {
     setSelectedEquipmentId(equipmentId)
@@ -42,6 +76,9 @@ export default function App() {
     setSelectedEquipmentId(null)
     setTab('dashboard')
   }
+
+  const displayName = user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? 'Utilisateur'
+  const roleLabel = role === 'admin' ? 'Administrateur' : 'Technicien'
 
   return (
     <div className="min-h-screen bg-white">
@@ -58,7 +95,7 @@ export default function App() {
           </div>
 
           <nav className="mt-6 space-y-2">
-            {TABS.map((t) => {
+            {tabs.map((t) => {
               const active = tab === t.id && !selectedEquipmentId
               return (
                 <button
@@ -87,7 +124,10 @@ export default function App() {
               <LifeBuoy className="h-4 w-4" />
               Help &amp; information
             </button>
-            <button className="flex w-full items-center gap-3 rounded-full px-4 py-3 text-sm text-[--color-graphite-500] hover:bg-[--color-graphite-50] hover:text-[--color-graphite-900]">
+            <button
+              onClick={() => signOut()}
+              className="flex w-full items-center gap-3 rounded-full px-4 py-3 text-sm text-[--color-graphite-500] hover:bg-[--color-graphite-50] hover:text-[--color-graphite-900]"
+            >
               <LogOut className="h-4 w-4" />
               Log out
             </button>
@@ -116,12 +156,11 @@ export default function App() {
                   <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-[--color-status-critical]" />
                 </button>
                 <div className="flex items-center gap-3 rounded-full border border-[--color-graphite-100] bg-white px-3 py-2 shadow-sm">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[--color-status-normal-bg] font-semibold text-[--color-status-normal]">GA</div>
-                  <div className="hidden text-left sm:block">
-                    <p className="text-sm font-semibold text-[--color-graphite-900]">Graham Alexander</p>
-                    <p className="text-xs text-[--color-graphite-500]">Operations manager</p>
+                  <div className="hidden text-right sm:block">
+                    <p className="text-sm font-semibold text-[--color-graphite-900]">{displayName}</p>
+                    <p className="text-xs text-[--color-graphite-500]">{roleLabel}</p>
                   </div>
-                  <ChevronDown className="h-4 w-4 text-[--color-graphite-400]" />
+                  <UserButton />
                 </div>
               </div>
             </div>
@@ -137,18 +176,14 @@ export default function App() {
             ) : tab === 'dashboard' ? (
               <Dashboard inspections={inspections} onSelectEquipment={openEquipmentDetails} />
             ) : null}
-            {tab === 'inspection' && (
-              <div className="space-y-4">
-                <TechnicianForm activeTechnicianId={technicianId} onSelect={setTechnicianId} />
-                <InspectionForm technicianId={technicianId} />
-              </div>
-            )}
-            {tab === 'history' && <History inspections={inspections} />}
-            {tab === 'excel' && <ImportExport />}
+            {tab === 'inspection' && !selectedEquipmentId && <InspectionForm role={role} />}
+            {tab === 'history' && !selectedEquipmentId && <History inspections={inspections} />}
+            {tab === 'excel' && !selectedEquipmentId && role === 'admin' && <ImportExport />}
+            {tab === 'assignments' && !selectedEquipmentId && role === 'admin' && <AdminAssignments />}
           </main>
 
           <footer className="border-t border-[--color-graphite-100] bg-white px-6 py-4 text-center text-xs text-[--color-graphite-500]">
-            Démonstrateur frontend — données stockées localement dans ce navigateur (localStorage). Aucune donnée n'est envoyée à un serveur.
+            SBM Tunisie — Contrôle journalier des équipements. Connecté en tant que {displayName} ({roleLabel}).
           </footer>
         </div>
       </div>
