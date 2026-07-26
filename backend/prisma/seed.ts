@@ -1,8 +1,6 @@
 import 'dotenv/config'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../src/db'
 import { EQUIPMENT_DEFINITIONS } from '../../client/src/data/equipment'
-
-const prisma = new PrismaClient()
 
 async function main() {
   for (const equipment of EQUIPMENT_DEFINITIONS) {

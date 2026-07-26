@@ -11,6 +11,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
+    "sync:users": "tsx src/scripts/syncClerkUsers.ts",
     "test": "echo \"No backend tests yet\""
   },
   "keywords": [],
@@ -19,11 +20,11 @@
   "type": "commonjs",
   "dependencies": {
     "@clerk/express": "^2.1.44",
+    "@prisma/adapter-pg": "^7.9.0",
     "@prisma/client": "^7.9.0",
     "cors": "^2.8.6",
     "dotenv": "^17.2.1",
-    "express": "^5.2.1",
-    "svix": "^1.98.0"
+    "express": "^5.2.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
