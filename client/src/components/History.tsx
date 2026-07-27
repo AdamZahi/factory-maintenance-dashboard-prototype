@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { Card, CardHeader, Button } from './ui/Primitives'
 import { StatusBadge } from './ui/StatusBadge'
@@ -10,9 +10,17 @@ import { useConfirm } from './ui/ConfirmDialog'
 import type { InspectionRecord, StatusLevel } from '../types'
 import { ChevronDown, ChevronUp, Pencil, Save, X } from 'lucide-react'
 
-export function History({ inspections, onFilterChange }: { inspections: InspectionRecord[]; onFilterChange?: (f: FilterState) => void }) {
+export function History({ inspections, focusInspectionId, onFilterChange }: { inspections: InspectionRecord[]; focusInspectionId?: string | null; onFilterChange?: (f: FilterState) => void }) {
   const [filters, setFilters] = useState<FilterState>({ dateFrom: '', dateTo: '', equipmentId: 'all', status: 'all' })
   const [expanded, setExpanded] = useState<string | null>(null)
+
+  // When navigated here from a notification/email link, expand & scroll to it.
+  useEffect(() => {
+    if (!focusInspectionId) return
+    setExpanded(focusInspectionId)
+    const el = document.getElementById(`inspection-${focusInspectionId}`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [focusInspectionId])
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [draftValues, setDraftValues] = useState<Record<string, string>>({})
   const { save, remove } = useInspections()
@@ -162,7 +170,7 @@ export function History({ inspections, onFilterChange }: { inspections: Inspecti
             )}
             {filtered.map((r) => (
               <Fragment key={r.id}>
-                <tr className="cursor-pointer border-b border-[--color-graphite-100] hover:bg-[--color-graphite-50]" onClick={() => setExpanded(expanded === r.id ? null : r.id)}>
+                <tr id={`inspection-${r.id}`} className={`cursor-pointer border-b border-[--color-graphite-100] transition-colors hover:bg-[--color-graphite-50] ${focusInspectionId === r.id ? 'bg-[--color-brand-50]' : ''}`} onClick={() => setExpanded(expanded === r.id ? null : r.id)}>
                   <td className="px-5 py-3 font-mono">{format(parseISO(r.date), 'dd/MM/yyyy')}</td>
                   <td className="px-5 py-3">{r.technicianName}</td>
                   <td className="px-5 py-3"><StatusBadge status={r.overallStatus} compact /></td>

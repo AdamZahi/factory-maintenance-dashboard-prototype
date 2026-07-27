@@ -12,20 +12,39 @@ enum Role {
 }
 
 model User {
-  id          String               @id
-  email       String               @unique
-  name        String
-  role        Role                 @default(TECHNICIAN)
-  createdAt   DateTime             @default(now())
-  assignments EquipmentAssignment[]
-  inspections Inspection[]
+  id            String               @id
+  email         String               @unique
+  name          String
+  role          Role                 @default(TECHNICIAN)
+  createdAt     DateTime             @default(now())
+  assignments   EquipmentAssignment[]
+  inspections   Inspection[]
+  notifications Notification[]
 }
 
 model Equipment {
-  id          String               @id
-  name        String
-  assignments EquipmentAssignment[]
-  readings    EquipmentReading[]
+  id            String               @id
+  name          String
+  assignments   EquipmentAssignment[]
+  readings      EquipmentReading[]
+  notifications Notification[]
+}
+
+model Notification {
+  id           String    @id @default(cuid())
+  recipient    User      @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  recipientId  String
+  equipment    Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  equipmentId  String
+  inspectionId String
+  status       String // "warning" | "critical" — the status that triggered it
+  message      String
+  emailSent    Boolean   @default(false)
+  read         Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+
+  @@index([recipientId, read])
+  @@index([recipientId, createdAt])
 }
 
 model EquipmentAssignment {

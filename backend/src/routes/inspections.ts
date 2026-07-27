@@ -4,6 +4,7 @@ import { prisma } from '../db'
 import { requireUser } from '../middleware/auth'
 import { unauthorizedEquipmentFor } from '../middleware/equipmentAccess'
 import type { CurrentUser } from '../middleware/auth'
+import { notifyOnInspection } from '../services/notifications'
 
 // /api/inspections
 // GET         -> technicians: only their own; admins: all (+ ?technicianId= filter)
@@ -75,7 +76,7 @@ async function upsertInspection(user: CurrentUser, body: IncomingInspection) {
 
   const id = body.id
 
-  const result = await prisma.$transaction(async (tx) => {
+  const { inspection, created } = await prisma.$transaction(async (tx) => {
     if (id) {
       const existing = await tx.inspection.findUnique({ where: { id } })
       if (existing && existing.technicianId !== user.id && user.role !== 'ADMIN') {
@@ -83,7 +84,7 @@ async function upsertInspection(user: CurrentUser, body: IncomingInspection) {
       }
       // Replace readings wholesale on update.
       await tx.equipmentReading.deleteMany({ where: { inspectionId: id } })
-      return tx.inspection.upsert({
+      const row = await tx.inspection.upsert({
         where: { id },
         update: {
           date,
@@ -99,9 +100,10 @@ async function upsertInspection(user: CurrentUser, body: IncomingInspection) {
         },
         include: { technician: true, readings: true },
       })
+      return { inspection: row, created: existing === null }
     }
 
-    return tx.inspection.create({
+    const row = await tx.inspection.create({
       data: {
         date,
         overallStatus,
@@ -110,9 +112,10 @@ async function upsertInspection(user: CurrentUser, body: IncomingInspection) {
       },
       include: { technician: true, readings: true },
     })
+    return { inspection: row, created: true }
   })
 
-  return serialize(result)
+  return { record: serialize(inspection), created }
 }
 
 inspectionsRouter.get('/', async (req, res) => {
@@ -136,7 +139,16 @@ inspectionsRouter.get('/', async (req, res) => {
 
 inspectionsRouter.post('/', async (req, res) => {
   try {
-    const record = await upsertInspection(req.currentUser!, req.body ?? {})
+    const { record, created } = await upsertInspection(req.currentUser!, req.body ?? {})
+    // Alert notifications fire only for newly created inspections (not edits),
+    // synchronously but isolated: a notifier failure must not fail the save.
+    if (created) {
+      try {
+        await notifyOnInspection(record)
+      } catch (err) {
+        console.error('[inspections] notifyOnInspection failed', err)
+      }
+    }
     res.status(201).json(record)
   } catch (err) {
     if (err instanceof AccessError) return res.status(403).json({ error: err.message })
@@ -145,6 +157,8 @@ inspectionsRouter.post('/', async (req, res) => {
   }
 })
 
+// Bulk import (Excel). Intentionally does NOT trigger notifications — importing
+// historical sheets should not blast alerts for past states.
 inspectionsRouter.post('/batch', async (req, res) => {
   const items = Array.isArray(req.body) ? req.body : req.body?.items
   if (!Array.isArray(items)) return res.status(400).json({ error: 'Expected an array of inspections' })
@@ -152,7 +166,8 @@ inspectionsRouter.post('/batch', async (req, res) => {
   const saved = []
   try {
     for (const item of items) {
-      saved.push(await upsertInspection(req.currentUser!, item))
+      const { record } = await upsertInspection(req.currentUser!, item)
+      saved.push(record)
     }
     res.status(201).json(saved)
   } catch (err) {

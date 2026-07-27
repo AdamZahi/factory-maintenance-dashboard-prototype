@@ -47,7 +47,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             <Button variant="ghost" onClick={() => settle(false)}>
               {state?.cancelLabel ?? 'Annuler'}
             </Button>
-            <Button variant={state?.tone === 'danger' ? 'danger' : 'primary'} onClick={() => settle(true)}>
+            <Button className="bg-red-600 hover:bg-red-700" variant={state?.tone === 'danger' ? 'danger' : 'primary'} onClick={() => settle(true)}>
               {state?.confirmLabel ?? 'Confirmer'}
             </Button>
           </>

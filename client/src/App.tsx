@@ -8,12 +8,13 @@ import { EquipmentParametersDetails } from './components/EquipmentParametersDeta
 import { AdminAssignments } from './components/AdminAssignments'
 import { Sidebar, type NavItem } from './components/layout/Sidebar'
 import { SettingsPanel } from './components/SettingsPanel'
+import { NotificationBell } from './components/NotificationBell'
 import { ToastProvider } from './components/ui/Toast'
 import { ConfirmProvider } from './components/ui/ConfirmDialog'
 import { useInspections } from './hooks/useData'
 import { usePreferences } from './hooks/usePreferences'
 import { setAuthTokenGetter } from './lib/storage'
-import { LayoutDashboard, ClipboardList, History as HistoryIcon, FileSpreadsheet, Users, Search, Bell, Menu } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, History as HistoryIcon, FileSpreadsheet, Users, Search, Menu } from 'lucide-react'
 
 type Tab = 'dashboard' | 'inspection' | 'history' | 'excel' | 'assignments'
 type Role = 'admin' | 'technician'
@@ -76,7 +77,26 @@ function AuthenticatedApp() {
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [historyFocusId, setHistoryFocusId] = useState<string | null>(null)
   const { items: inspections } = useInspections()
+
+  // Open a specific inspection in History (from a notification or an email deep-link).
+  const focusInspection = (inspectionId: string) => {
+    setSelectedEquipmentId(null)
+    setTab('history')
+    setHistoryFocusId(inspectionId)
+    setMobileNavOpen(false)
+  }
+
+  // Email links point at /?inspection=<id> — honor it once on mount.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('inspection')
+    if (id) {
+      focusInspection(id)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const displayName = user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? 'Utilisateur'
   const roleLabel = role === 'admin' ? 'Administrateur' : 'Technicien'
@@ -136,10 +156,7 @@ function AuthenticatedApp() {
                   className="w-full rounded-full border border-[--color-graphite-100] bg-[--color-graphite-50] py-2.5 pl-10 pr-4 text-sm outline-none transition-colors focus:border-[--color-amber-signal] focus:bg-white"
                 />
               </label>
-              <button className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[--color-graphite-100] bg-white text-[--color-graphite-500] transition-colors hover:text-[--color-graphite-900]">
-                <Bell className="h-4 w-4" />
-                <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-[--color-status-critical]" />
-              </button>
+              <NotificationBell onNavigate={focusInspection} />
             </div>
           </div>
         </header>
@@ -153,7 +170,7 @@ function AuthenticatedApp() {
             ) : tab === 'inspection' ? (
               <InspectionForm role={role} />
             ) : tab === 'history' ? (
-              <History inspections={inspections} />
+              <History inspections={inspections} focusInspectionId={historyFocusId} />
             ) : tab === 'excel' && role === 'admin' ? (
               <ImportExport />
             ) : tab === 'assignments' && role === 'admin' ? (
