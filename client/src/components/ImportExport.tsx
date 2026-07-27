@@ -102,7 +102,7 @@ export function ImportExport() {
             Semaine du {format(startOfWeek(new Date(exportWeek), { weekStartsOn: 1 }), 'dd/MM/yyyy')} — export au format .xlsx, mise en page identique à la fiche de contrôle actuelle.
           </p>
           <Badge>{inspections.filter((r) => format(startOfWeek(new Date(r.date), { weekStartsOn: 1 }), 'yyyy-MM-dd') === format(startOfWeek(new Date(exportWeek), { weekStartsOn: 1 }), 'yyyy-MM-dd')).length} inspection(s) sur cette semaine</Badge>
-          <Button variant="primary" className='p-0.5 m-0.5 cursor-pointer bg-green-700 hover:bg-green-800' onClick={handleExport}>
+          <Button variant="primary" className="cursor-pointer bg-green-500" onClick={handleExport}>
             <Download className="h-4 w-4" /> Exporter en Excel
           </Button>
         </div>

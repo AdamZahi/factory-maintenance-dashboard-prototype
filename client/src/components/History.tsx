@@ -5,6 +5,8 @@ import { StatusBadge } from './ui/StatusBadge'
 import { EQUIPMENT_DEFINITIONS } from '../data/equipment'
 import { evaluateEquipment, worstStatus } from '../lib/validation'
 import { useInspections } from '../hooks/useData'
+import { useToast } from './ui/Toast'
+import { useConfirm } from './ui/ConfirmDialog'
 import type { InspectionRecord, StatusLevel } from '../types'
 import { ChevronDown, ChevronUp, Pencil, Save, X } from 'lucide-react'
 
@@ -14,6 +16,8 @@ export function History({ inspections, onFilterChange }: { inspections: Inspecti
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [draftValues, setDraftValues] = useState<Record<string, string>>({})
   const { save, remove } = useInspections()
+  const toast = useToast()
+  const confirm = useConfirm()
 
   const update = (patch: Partial<FilterState>) => {
     const next = { ...filters, ...patch }
@@ -54,10 +58,13 @@ export function History({ inspections, onFilterChange }: { inspections: Inspecti
     setDraftValues({})
   }
 
-  const deleteInspection = (record: InspectionRecord) => {
-    const confirmed = window.confirm(
-      `Supprimer l’inspection du ${format(parseISO(record.date), 'dd/MM/yyyy')} ? Cette action supprimera toute la journée et ne peut pas être annulée.`
-    )
+  const deleteInspection = async (record: InspectionRecord) => {
+    const confirmed = await confirm({
+      title: 'Supprimer l’inspection',
+      message: `Supprimer l’inspection du ${format(parseISO(record.date), 'dd/MM/yyyy')} ? Cette action supprime toute la journée et est irréversible.`,
+      confirmLabel: 'Supprimer',
+      tone: 'danger',
+    })
     if (!confirmed) return
 
     if (editingKey?.startsWith(`${record.id}:`)) {
@@ -67,6 +74,7 @@ export function History({ inspections, onFilterChange }: { inspections: Inspecti
       setExpanded(null)
     }
     remove(record.id)
+    toast.success('Inspection supprimée', `Journée du ${format(parseISO(record.date), 'dd/MM/yyyy')} supprimée.`)
   }
 
   const saveEdit = (record: InspectionRecord, equipmentId: string) => {
@@ -93,6 +101,7 @@ export function History({ inspections, onFilterChange }: { inspections: Inspecti
       overallStatus: nextOverallStatus === 'unknown' ? 'normal' : nextOverallStatus,
     })
     cancelEdit()
+    toast.success('Modifications enregistrées', `${definition.name} mis à jour.`)
   }
 
   return (
@@ -130,7 +139,7 @@ export function History({ inspections, onFilterChange }: { inspections: Inspecti
         </div>
         {(filters.dateFrom || filters.dateTo || filters.equipmentId !== 'all' || filters.status !== 'all') && (
           <div className="col-span-2 sm:col-span-4">
-            <Button size="sm" variant="ghost" onClick={() => update({ dateFrom: '', dateTo: '', equipmentId: 'all', status: 'all' })}>Réinitialiser les filtres</Button>
+            <Button size="sm" variant="ghost" className="bg-graphite-400 hover:bg-graphite-700 text-white cursor-pointer" onClick={() => update({ dateFrom: '', dateTo: '', equipmentId: 'all', status: 'all' })}>Réinitialiser les filtres</Button>
           </div>
         )}
       </div>
@@ -207,7 +216,7 @@ export function History({ inspections, onFilterChange }: { inspections: Inspecti
                                     <Button size="sm" className="bg-gray-500 hover:bg-gray-700 text-white cursor-pointer" variant="ghost" onClick={(event) => { event.stopPropagation(); cancelEdit() }}>
                                       Annuler
                                     </Button>
-                                    <Button size="sm" className="bg-green-500 hover:bg-green-700 cursor-pointer" variant="primary" onClick={(event) => { event.stopPropagation(); saveEdit(r, eq.equipmentId) }}>
+                                    <Button size="sm" className="bg-teal-600 hover:bg-teal-800 cursor-pointer" variant="primary" onClick={(event) => { event.stopPropagation(); saveEdit(r, eq.equipmentId) }}>
                                       <Save className="h-3.5 w-3.5" />
                                       Enregistrer
                                     </Button>

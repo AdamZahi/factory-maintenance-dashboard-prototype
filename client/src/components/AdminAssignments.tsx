@@ -9,7 +9,8 @@ import {
   setUserRole,
   type AppUser,
 } from '../hooks/useData'
-import { ShieldCheck, User, Loader2 } from 'lucide-react'
+import { useToast } from './ui/Toast'
+import { ShieldCheck, User, Loader2, ChevronDown } from 'lucide-react'
 
 // Admin-only screen: a technicians × equipment grid of checkboxes, plus a
 // per-user role toggle (promote/demote). Every action hits the backend and
@@ -19,6 +20,8 @@ export function AdminAssignments() {
   const [usersLoading, setUsersLoading] = useState(true)
   const { assignments, loading: assignmentsLoading, reload: reloadAssignments } = useAssignments()
   const [pending, setPending] = useState<Set<string>>(new Set())
+  const [usersOpen, setUsersOpen] = useState(true)
+  const toast = useToast()
 
   const loadUsers = useCallback(async () => {
     setUsersLoading(true)
@@ -48,13 +51,21 @@ export function AdminAssignments() {
 
   const toggle = async (technicianId: string, equipmentId: string) => {
     const key = `${technicianId}:${equipmentId}`
+    const wasAssigned = assigned.has(key)
+    const tech = technicians.find((t) => t.id === technicianId)
+    const equipmentName = EQUIPMENT_DEFINITIONS.find((d) => d.id === equipmentId)?.name ?? equipmentId
     markPending(key, true)
     try {
-      if (assigned.has(key)) await deleteAssignment(technicianId, equipmentId)
+      if (wasAssigned) await deleteAssignment(technicianId, equipmentId)
       else await createAssignment(technicianId, equipmentId)
       await reloadAssignments()
+      toast.success(
+        wasAssigned ? 'Affectation retirée' : 'Affectation ajoutée',
+        `${equipmentName} ${wasAssigned ? 'retiré de' : 'affecté à'} ${tech?.name ?? 'le technicien'}.`,
+      )
     } catch (err) {
       console.error('[admin] toggle assignment failed', err)
+      toast.error('Échec de la mise à jour', 'Impossible de modifier l’affectation.')
     } finally {
       markPending(key, false)
     }
@@ -66,8 +77,10 @@ export function AdminAssignments() {
     try {
       await setUserRole(user.id, nextRole)
       await loadUsers()
+      toast.success('Rôle mis à jour', `${user.name} est maintenant ${nextRole === 'ADMIN' ? 'administrateur' : 'technicien'}.`)
     } catch (err) {
       console.error('[admin] change role failed', err)
+      toast.error('Échec du changement de rôle', 'La mise à jour n’a pas pu être appliquée.')
     } finally {
       markPending(`role:${user.id}`, false)
     }
@@ -76,38 +89,54 @@ export function AdminAssignments() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader
-          title="Utilisateurs et rôles"
-          subtitle="Promouvoir un technicien en administrateur ou l'inverse"
-        />
-        <div className="divide-y divide-[--color-graphite-100]">
-          {usersLoading ? (
-            <div className="flex items-center gap-2 p-5 text-sm text-[--color-graphite-500]">
-              <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
-            </div>
-          ) : users.length === 0 ? (
-            <p className="p-5 text-sm text-[--color-graphite-500]">
-              Aucun utilisateur. Les comptes apparaissent ici après leur première connexion via Clerk.
-            </p>
-          ) : (
-            users.map((u) => (
+        <button
+          onClick={() => setUsersOpen((v) => !v)}
+          aria-expanded={usersOpen}
+          className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors hover:bg-[--color-graphite-50] sm:px-6"
+        >
+          <div>
+            <h3 className="text-[15px] font-semibold text-[--color-graphite-900]">Utilisateurs et rôles</h3>
+            <p className="mt-0.5 text-xs text-[--color-graphite-500]">Promouvoir un technicien en administrateur ou l'inverse</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {!usersLoading && (
+              <span className="inline-flex items-center rounded-full bg-[--color-graphite-100] px-2.5 py-1 text-xs font-medium text-[--color-graphite-600]">
+                {users.length} utilisateur{users.length > 1 ? 's' : ''}
+              </span>
+            )}
+            <ChevronDown className={`h-4 w-4 text-[--color-graphite-400] transition-transform duration-200 ${usersOpen ? 'rotate-180' : ''}`} />
+          </div>
+        </button>
+        {usersOpen && (
+          <div className="animate-fade-in divide-y divide-[--color-graphite-100] border-t border-[--color-graphite-100]">
+            {usersLoading ? (
+              <div className="flex items-center gap-2 p-5 text-sm text-[--color-graphite-500]">
+                <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
+              </div>
+            ) : users.length === 0 ? (
+              <p className="p-5 text-sm text-[--color-graphite-500]">
+                Aucun utilisateur. Les comptes apparaissent ici après leur première connexion via Clerk.
+              </p>
+            ) : (
+              users.map((u) => (
               <div key={u.id} className="flex items-center justify-between gap-3 p-4">
                 <div className="flex items-center gap-3">
                   <span className={`flex h-9 w-9 items-center justify-center rounded-full ${u.role === 'ADMIN' ? 'bg-[--color-status-normal-bg] text-[--color-status-normal]' : 'bg-[--color-graphite-50] text-[--color-graphite-500]'}`}>
-                    {u.role === 'ADMIN' ? <ShieldCheck className="h-4 w-4" /> : <User className="h-4 w-4" />}
+                    {u.role === 'ADMIN' ? <ShieldCheck className="h-6 w-6" /> : <User className="h-6 w-6" />}
                   </span>
                   <div>
                     <p className="text-sm font-medium text-[--color-graphite-900]">{u.name}</p>
                     <p className="text-xs text-[--color-graphite-500]">{u.email} · {u.role === 'ADMIN' ? 'Administrateur' : 'Technicien'}</p>
                   </div>
                 </div>
-                <Button size="sm" variant="ghost" disabled={pending.has(`role:${u.id}`)} onClick={() => changeRole(u)}>
+                <Button size="sm" variant="ghost" className="bg-graphite-500 hover:bg-graphite-700 text-white cursor-pointer" disabled={pending.has(`role:${u.id}`)} onClick={() => changeRole(u)}>
                   {u.role === 'ADMIN' ? 'Rétrograder en technicien' : 'Promouvoir admin'}
                 </Button>
               </div>
-            ))
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        )}
       </Card>
 
       <Card>

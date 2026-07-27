@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { useUser } from '@clerk/clerk-react'
 import { Card, CardHeader, Button, Badge } from './ui/Primitives'
 import { StatusBadge } from './ui/StatusBadge'
 import { EQUIPMENT_DEFINITIONS } from '../data/equipment'
 import { evaluateEquipment, worstStatus } from '../lib/validation'
 import { useInspections, useAssignments } from '../hooks/useData'
+import { useToast } from './ui/Toast'
 import { generateId } from '../lib/storage'
 import type { StatusLevel } from '../types'
 import { ClipboardCheck, AlertTriangle, Lock } from 'lucide-react'
@@ -15,6 +16,7 @@ type ValuesState = Record<string, Record<string, string>>
 export function InspectionForm({ role }: { role: 'admin' | 'technician' }) {
   const { user } = useUser()
   const { save } = useInspections()
+  const toast = useToast()
   // Technicians only see equipment they're assigned to; admins see everything.
   const { assignments, loading: assignmentsLoading } = useAssignments(role === 'admin' ? undefined : 'me')
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
@@ -51,6 +53,11 @@ export function InspectionForm({ role }: { role: 'admin' | 'technician' }) {
   }
 
   const handleSubmit = () => {
+    const hasAnyValue = readings.some((r) => r.status !== 'unknown')
+    if (!hasAnyValue) {
+      toast.warning('Aucune valeur saisie', 'Renseignez au moins un paramètre avant d’enregistrer.')
+      return
+    }
     save({
       id: generateId('insp'),
       date,
@@ -65,6 +72,13 @@ export function InspectionForm({ role }: { role: 'admin' | 'technician' }) {
     })
     setValues({})
     setSaved(true)
+    if (criticalCount > 0) {
+      toast.error('Inspection enregistrée avec anomalies', `${criticalCount} paramètre(s) critique(s) détecté(s).`)
+    } else if (warningCount > 0) {
+      toast.warning('Inspection enregistrée', `${warningCount} paramètre(s) en alerte.`)
+    } else {
+      toast.success('Inspection enregistrée', `Journée du ${format(parseISO(date), 'dd/MM/yyyy')} sauvegardée.`)
+    }
   }
 
   if (role === 'technician' && !assignmentsLoading && visibleDefinitions.length === 0) {
@@ -168,7 +182,7 @@ export function InspectionForm({ role }: { role: 'admin' | 'technician' }) {
             </Badge>
           )}
         </div>
-        <Button variant="primary" className="ml-4 bg-green-800" onClick={handleSubmit}>
+        <Button variant="primary" className="ml-4 bg-teal-400 hover:bg-teal-600" onClick={handleSubmit}>
           Enregistrer l'inspection
         </Button>
       </div>

@@ -6,17 +6,35 @@
   --font-body: 'Inter', sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
 
-  --color-graphite-950: #12181F;
-  --color-graphite-900: #1B232D;
-  --color-graphite-800: #263041;
-  --color-graphite-700: #3A4657;
+  /* Neutral gray ramp (cool slate) */
+  --color-graphite-950: #0B1220;
+  --color-graphite-900: #17202E;
+  --color-graphite-800: #26313F;
+  --color-graphite-700: #3B4859;
+  --color-graphite-600: #556074;
   --color-graphite-500: #6B7A8F;
+  --color-graphite-400: #94A2B3;
+  --color-graphite-300: #C2CBD6;
   --color-graphite-200: #DCE1E7;
   --color-graphite-100: #EDF0F3;
   --color-graphite-50: #F4F6F8;
 
-  --color-amber-signal: #E8862E;
-  --color-amber-signal-dark: #C96B1B;
+  /* Brand blue ramp */
+  --color-brand-50: #EEF4FF;
+  --color-brand-100: #DAE7FF;
+  --color-brand-200: #BCD3FF;
+  --color-brand-300: #8DB4FF;
+  --color-brand-400: #5B8DF9;
+  --color-brand-500: #3B76F0;
+  --color-brand-600: #2563EB;
+  --color-brand-700: #1D4FD0;
+  --color-brand-800: #1B44A8;
+  --color-brand-900: #1B3C86;
+
+  /* `amber-signal` kept as the accent alias, now repointed to brand blue so
+     every existing accent reference re-themes without per-file edits. */
+  --color-amber-signal: #2563EB;
+  --color-amber-signal-dark: #1D4FD0;
 
   --color-status-normal: #2E9E5B;
   --color-status-normal-bg: #E6F5EC;
@@ -78,5 +96,54 @@ body {
   animation: shimmer 1.4s infinite;
 }
 
+/* --- Motion system -------------------------------------------------------- */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-fade-in-up { animation: fade-in-up 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-fade-in    { animation: fade-in 300ms ease-out both; }
+.animate-scale-in   { animation: scale-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-slide-in   { animation: slide-in-right 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-overlay-in { animation: overlay-in 200ms ease-out both; }
+
+/* Stagger helper: set --i on children to cascade their entrance */
+.stagger > * { animation: fade-in-up 460ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(var(--i, 0) * 60ms); }
+
+/* Global "reduce animations" preference (toggled from Settings) + OS setting */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: var(--color-graphite-200); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-graphite-500); }

@@ -1,450 +1,463 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  AreaChart, Area, ReferenceDot,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, AreaChart, Area,
 } from 'recharts'
 import { format, parseISO, subDays } from 'date-fns'
-import { Card, CardHeader } from './ui/Primitives'
+import { Card, CardHeader, Button } from './ui/Primitives'
 import { StatusBadge, StatusDot } from './ui/StatusBadge'
 import { EQUIPMENT_DEFINITIONS } from '../data/equipment'
 import { statusColor } from '../lib/validation'
 import type { InspectionRecord, StatusLevel } from '../types'
-import { Activity, CheckCircle2, AlertTriangle, XCircle, ArrowRight, Bell, ChevronUp, ChevronDown } from 'lucide-react'
+import { Activity, CheckCircle2, AlertTriangle, XCircle, ArrowRight, Filter, RotateCcw, CalendarDays, Gauge } from 'lucide-react'
+
+// Categorical palette for per-field trend lines — validated colorblind-safe and
+// deliberately distinct from the reserved status green/amber/red.
+const SERIES_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#e87ba4', '#4a3aa7', '#e34948']
 
 function useCountUp(target: number) {
   const [value, setValue] = useState(0)
-
   useEffect(() => {
     const duration = 650
     const start = performance.now()
     let frame = 0
-
     const step = (now: number) => {
       const progress = Math.min((now - start) / duration, 1)
       const eased = 1 - Math.pow(1 - progress, 3)
       setValue(Math.round(target * eased))
       if (progress < 1) frame = requestAnimationFrame(step)
     }
-
     frame = requestAnimationFrame(step)
     return () => cancelAnimationFrame(frame)
   }, [target])
-
   return value
 }
-
-function KpiCard({
-  icon,
-  label,
-  value,
-  tint,
-  trend,
-  sparkline,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: number
-  tint: string
-  trend: { label: string; direction: 'up' | 'down'; value: string }
-  sparkline: number[]
-}) {
-  const animatedValue = useCountUp(value)
-  return (
-    <Card className="p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: `${tint}1A`, color: tint }}>
-            {icon}
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-wide text-[--color-graphite-500]">{label}</p>
-            <p className="mt-1 font-display text-3xl font-semibold tabular-nums text-[--color-graphite-900] animate-count-up">{animatedValue.toLocaleString('fr-FR')}</p>
-            <span className={`mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${trend.direction === 'up' ? 'bg-[--color-status-normal-bg] text-[--color-status-normal]' : 'bg-[--color-status-warning-bg] text-[--color-status-warning]'}`}>
-              {trend.direction === 'up' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              {trend.value} {trend.label}
-            </span>
-          </div>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex h-12 items-end gap-1.5">
-            {sparkline.map((bar, index) => (
-              <span
-                key={index}
-                className="w-1.5 rounded-full"
-                style={{ height: `${Math.max(10, bar)}px`, backgroundColor: tint, opacity: 0.18 + index * 0.12 }}
-              />
-            ))}
-          </div>
-          <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[--color-graphite-50] text-[--color-graphite-500]">
-            <Bell className="h-3.5 w-3.5" />
-          </div>
-        </div>
-      </div>
-    </Card>
-  )
-}
-
-type TrendRange = 'week' | 'month'
-
-type TrendPoint = {
-  date: string
-  label: string
-  [fieldId: string]: string | number
-}
-
-const TREND_COLORS = ['#3A4657', '#2E9E5B', '#E3A008', '#D6423C', '#4E7AE6', '#7A8AA3']
-const CHART_GRADIENT = '#2E9E5B'
 
 function parseChartValue(value: number | string | null): number | null {
   if (value === null || value === '' || value === undefined) return null
   if (typeof value === 'number') return value
   const match = value.match(/-?\d+(?:[.,]\d+)?/)
-  if (!match) return null
-  return parseFloat(match[0].replace(',', '.'))
+  return match ? parseFloat(match[0].replace(',', '.')) : null
 }
+
+interface Filters {
+  dateFrom: string
+  dateTo: string
+  equipmentId: string
+  technicianId: string
+  status: StatusLevel | 'all'
+}
+
+const EMPTY_FILTERS: Filters = { dateFrom: '', dateTo: '', equipmentId: 'all', technicianId: 'all', status: 'all' }
 
 export function Dashboard({
   inspections,
+  role,
   onSelectEquipment,
 }: {
   inspections: InspectionRecord[]
+  role: 'admin' | 'technician'
   onSelectEquipment?: (equipmentId: string) => void
 }) {
-  const [trendRange, setTrendRange] = useState<TrendRange>('week')
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
+  const [trendRange, setTrendRange] = useState<'week' | 'month'>('week')
+
+  const update = (patch: Partial<Filters>) => setFilters((prev) => ({ ...prev, ...patch }))
+  const isFiltered =
+    filters.dateFrom !== '' || filters.dateTo !== '' || filters.equipmentId !== 'all' || filters.technicianId !== 'all' || filters.status !== 'all'
+
+  const latestDate = useMemo(
+    () => inspections.reduce<string | null>((latest, r) => (latest && latest > r.date ? latest : r.date), null),
+    [inspections],
+  )
+
+  const technicianOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const r of inspections) if (r.technicianId) map.set(r.technicianId, r.technicianName)
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
+  }, [inspections])
+
+  const applyQuickRange = (days: number | null) => {
+    if (days === null) {
+      update({ dateFrom: '', dateTo: '' })
+      return
+    }
+    const end = latestDate ?? format(new Date(), 'yyyy-MM-dd')
+    update({ dateFrom: format(subDays(parseISO(end), days - 1), 'yyyy-MM-dd'), dateTo: end })
+  }
+
+  const filtered = useMemo(() => {
+    return inspections.filter((r) => {
+      if (filters.dateFrom && r.date < filters.dateFrom) return false
+      if (filters.dateTo && r.date > filters.dateTo) return false
+      if (filters.status !== 'all' && r.overallStatus !== filters.status) return false
+      if (filters.technicianId !== 'all' && r.technicianId !== filters.technicianId) return false
+      if (filters.equipmentId !== 'all') {
+        const has = r.equipmentReadings.some((e) => e.equipmentId === filters.equipmentId && e.status !== 'unknown')
+        if (!has) return false
+      }
+      return true
+    })
+  }, [inspections, filters])
 
   const kpis = useMemo(() => {
-    const total = inspections.length
     let normal = 0, warning = 0, critical = 0
-    for (const r of inspections) {
+    for (const r of filtered) {
       if (r.overallStatus === 'normal') normal++
       else if (r.overallStatus === 'warning') warning++
       else if (r.overallStatus === 'critical') critical++
     }
-    return { total, normal, warning, critical }
-  }, [inspections])
-
-  const kpiTrends = useMemo(() => {
-    const sorted = [...inspections].sort((a, b) => a.date.localeCompare(b.date))
-    const cutoffIndex = Math.max(0, sorted.length - 14)
-    const recent = sorted.slice(cutoffIndex)
-    const previous = sorted.slice(Math.max(0, cutoffIndex - recent.length), cutoffIndex)
-
-    const countByStatus = (items: InspectionRecord[]) => ({
-      total: items.length,
-      normal: items.filter((item) => item.overallStatus === 'normal').length,
-      warning: items.filter((item) => item.overallStatus === 'warning').length,
-      critical: items.filter((item) => item.overallStatus === 'critical').length,
-    })
-
-    const recentCounts = countByStatus(recent)
-    const previousCounts = countByStatus(previous)
-
-    const delta = (current: number, baseline: number) => {
-      if (baseline === 0) return current > 0 ? 100 : 0
-      return Math.round(((current - baseline) / baseline) * 100)
-    }
-
-    const sparkline = (items: InspectionRecord[], accessor: (item: InspectionRecord) => number) =>
-      items.slice(-6).map((item) => Math.max(10, accessor(item) * 12 + 8))
-
-    return {
-      total: { value: kpis.total, trend: { label: 'vs prev. période', direction: delta(recentCounts.total, previousCounts.total) >= 0 ? 'up' as const : 'down' as const, value: `${Math.abs(delta(recentCounts.total, previousCounts.total))}%` }, sparkline: sparkline(recent, () => 6) },
-      normal: { value: kpis.normal, trend: { label: 'vs prev. période', direction: delta(recentCounts.normal, previousCounts.normal) >= 0 ? 'up' as const : 'down' as const, value: `${Math.abs(delta(recentCounts.normal, previousCounts.normal))}%` }, sparkline: sparkline(recent, (item) => (item.overallStatus === 'normal' ? 1 : 0)) },
-      warning: { value: kpis.warning, trend: { label: 'vs prev. période', direction: delta(recentCounts.warning, previousCounts.warning) >= 0 ? 'up' as const : 'down' as const, value: `${Math.abs(delta(recentCounts.warning, previousCounts.warning))}%` }, sparkline: sparkline(recent, (item) => (item.overallStatus === 'warning' ? 1 : 0)) },
-      critical: { value: kpis.critical, trend: { label: 'vs prev. période', direction: delta(recentCounts.critical, previousCounts.critical) >= 0 ? 'up' as const : 'down' as const, value: `${Math.abs(delta(recentCounts.critical, previousCounts.critical))}%` }, sparkline: sparkline(recent, (item) => (item.overallStatus === 'critical' ? 1 : 0)) },
-    }
-  }, [inspections, kpis])
+    return { total: filtered.length, normal, warning, critical }
+  }, [filtered])
 
   const distribution = useMemo(() => {
     const counts: Record<string, number> = {}
-    for (const def of EQUIPMENT_DEFINITIONS) {
-      const readings = inspections.flatMap((i) => i.equipmentReadings.filter((r) => r.equipmentId === def.id))
-      for (const r of readings) counts[r.status] = (counts[r.status] ?? 0) + 1
+    const defs = filters.equipmentId === 'all' ? EQUIPMENT_DEFINITIONS : EQUIPMENT_DEFINITIONS.filter((d) => d.id === filters.equipmentId)
+    for (const def of defs) {
+      for (const r of filtered) {
+        for (const reading of r.equipmentReadings) {
+          if (reading.equipmentId === def.id && reading.status !== 'unknown') counts[reading.status] = (counts[reading.status] ?? 0) + 1
+        }
+      }
     }
     return [
       { name: 'Normal', value: counts.normal ?? 0, color: statusColor('normal') },
       { name: 'Alerte', value: counts.warning ?? 0, color: statusColor('warning') },
       { name: 'Critique', value: counts.critical ?? 0, color: statusColor('critical') },
     ].filter((d) => d.value > 0)
-  }, [inspections])
+  }, [filtered, filters.equipmentId])
+  const totalReadings = distribution.reduce((sum, d) => sum + d.value, 0)
 
-  const statusBreakdownByDay = useMemo(() => {
-    const byDate = new Map<string, { date: string; label: string; normal: number; warning: number; critical: number; total: number }>()
-    for (const r of [...inspections].sort((a, b) => a.date.localeCompare(b.date))) {
-      const entry = byDate.get(r.date) ?? { date: r.date, label: format(parseISO(r.date), 'dd/MM'), normal: 0, warning: 0, critical: 0, total: 0 }
-      entry.total += 1
+  const statusByDay = useMemo(() => {
+    const byDate = new Map<string, { date: string; label: string; normal: number; warning: number; critical: number }>()
+    for (const r of [...filtered].sort((a, b) => a.date.localeCompare(b.date))) {
+      const entry = byDate.get(r.date) ?? { date: r.date, label: format(parseISO(r.date), 'dd/MM'), normal: 0, warning: 0, critical: 0 }
       if (r.overallStatus === 'normal') entry.normal += 1
       if (r.overallStatus === 'warning') entry.warning += 1
       if (r.overallStatus === 'critical') entry.critical += 1
       byDate.set(r.date, entry)
     }
     return Array.from(byDate.values())
-  }, [inspections])
+  }, [filtered])
 
-  const criticalEquipment = useMemo(() => {
-    const latestByEquipment = new Map<string, { status: StatusLevel; date: string; message?: string }>()
-    for (const r of [...inspections].sort((a, b) => a.date.localeCompare(b.date))) {
-      for (const reading of r.equipmentReadings) {
-        if (reading.status === 'critical' || reading.status === 'warning') {
-          const worstField = reading.fields.find((f) => f.status === reading.status)
-          latestByEquipment.set(reading.equipmentId, { status: reading.status, date: r.date, message: worstField?.message })
-        } else if (reading.status === 'normal') {
-          latestByEquipment.delete(reading.equipmentId)
+  // Latest known status per equipment (across the filtered set).
+  const equipmentHealth = useMemo(() => {
+    const defs = filters.equipmentId === 'all' ? EQUIPMENT_DEFINITIONS : EQUIPMENT_DEFINITIONS.filter((d) => d.id === filters.equipmentId)
+    return defs.map((def) => {
+      let status: StatusLevel = 'unknown'
+      let date: string | null = null
+      let message: string | undefined
+      for (const r of [...filtered].sort((a, b) => a.date.localeCompare(b.date))) {
+        const reading = r.equipmentReadings.find((e) => e.equipmentId === def.id && e.status !== 'unknown')
+        if (reading) {
+          status = reading.status
+          date = r.date
+          message = reading.fields.find((f) => f.status === reading.status)?.message
         }
       }
-    }
-    return Array.from(latestByEquipment.entries())
-      .map(([equipmentId, info]) => ({ equipmentId, ...info, name: EQUIPMENT_DEFINITIONS.find((e) => e.id === equipmentId)?.name ?? equipmentId }))
-      .sort((a, b) => (a.status === b.status ? 0 : a.status === 'critical' ? -1 : 1))
-  }, [inspections])
+      return { id: def.id, name: def.name, status, date, message }
+    })
+  }, [filtered, filters.equipmentId])
+
+  const watchList = useMemo(
+    () =>
+      equipmentHealth
+        .filter((e) => e.status === 'critical' || e.status === 'warning')
+        .sort((a, b) => (a.status === b.status ? 0 : a.status === 'critical' ? -1 : 1)),
+    [equipmentHealth],
+  )
 
   const equipmentTrends = useMemo(() => {
-    const latestDate = inspections.reduce<string | null>((latest, record) => (latest && latest > record.date ? latest : record.date), null)
     const cutoff = latestDate ? format(subDays(parseISO(latestDate), trendRange === 'week' ? 6 : 29), 'yyyy-MM-dd') : null
-
-    return EQUIPMENT_DEFINITIONS.map((definition) => {
-      const byDate = new Map<string, TrendPoint>()
-
-      for (const inspection of inspections) {
+    const defs = filters.equipmentId === 'all' ? EQUIPMENT_DEFINITIONS : EQUIPMENT_DEFINITIONS.filter((d) => d.id === filters.equipmentId)
+    return defs.map((definition) => {
+      const byDate = new Map<string, { date: string; label: string; [k: string]: string | number }>()
+      for (const inspection of filtered) {
         if (cutoff && inspection.date < cutoff) continue
-        const equipmentReading = inspection.equipmentReadings.find((reading) => reading.equipmentId === definition.id)
-        if (!equipmentReading) continue
-
-        const point = byDate.get(inspection.date) ?? {
-          date: inspection.date,
-          label: format(parseISO(inspection.date), 'dd/MM'),
-        }
-
+        const reading = inspection.equipmentReadings.find((e) => e.equipmentId === definition.id)
+        if (!reading) continue
+        const point = byDate.get(inspection.date) ?? { date: inspection.date, label: format(parseISO(inspection.date), 'dd/MM') }
         for (const field of definition.fields) {
-          const fieldReading = equipmentReading.fields.find((reading) => reading.fieldId === field.id)
-          const numericValue = parseChartValue(fieldReading?.value ?? null)
-          if (numericValue !== null) {
-            point[field.id] = numericValue
-          }
+          const fr = reading.fields.find((f) => f.fieldId === field.id)
+          const num = parseChartValue(fr?.value ?? null)
+          if (num !== null) point[field.id] = num
         }
-
         byDate.set(inspection.date, point)
       }
-
       const data = Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date))
-      const chartableFields = definition.fields.filter((field) => data.some((point) => typeof point[field.id] === 'number'))
-
+      const chartableFields = definition.fields.filter((f) => data.some((p) => typeof p[f.id] === 'number'))
       return { definition, data, chartableFields }
     })
-  }, [inspections, trendRange])
+  }, [filtered, filters.equipmentId, trendRange, latestDate])
 
-  const latestInspectionByEquipment = useMemo(() => {
-    const latest = new Map<string, string>()
-    for (const inspection of [...inspections].sort((a, b) => a.date.localeCompare(b.date))) {
-      for (const reading of inspection.equipmentReadings) {
-        latest.set(reading.equipmentId, inspection.date)
-      }
-    }
-    return latest
-  }, [inspections])
-
-  const latestPoint = statusBreakdownByDay.at(-1)
+  const rangeLabel =
+    filters.dateFrom || filters.dateTo
+      ? `${filters.dateFrom ? format(parseISO(filters.dateFrom), 'dd/MM/yy') : '…'} → ${filters.dateTo ? format(parseISO(filters.dateTo), 'dd/MM/yy') : '…'}`
+      : 'Toute la période'
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          icon={<Activity className="h-5 w-5" />}
-          label="Inspections"
-          value={kpis.total}
-          tint="#3A4657"
-          trend={kpiTrends.total.trend}
-          sparkline={kpiTrends.total.sparkline}
-        />
-        <KpiCard
-          icon={<CheckCircle2 className="h-5 w-5" />}
-          label="Normales"
-          value={kpis.normal}
-          tint={statusColor('normal')}
-          trend={kpiTrends.normal.trend}
-          sparkline={kpiTrends.normal.sparkline}
-        />
-        <KpiCard
-          icon={<AlertTriangle className="h-5 w-5" />}
-          label="Alertes"
-          value={kpis.warning}
-          tint={statusColor('warning')}
-          trend={kpiTrends.warning.trend}
-          sparkline={kpiTrends.warning.sparkline}
-        />
-        <KpiCard
-          icon={<XCircle className="h-5 w-5" />}
-          label="Critiques"
-          value={kpis.critical}
-          tint={statusColor('critical')}
-          trend={kpiTrends.critical.trend}
-          sparkline={kpiTrends.critical.sparkline}
-        />
+      {/* Filter bar */}
+      <Card className="p-4 sm:p-5">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex items-center gap-2 text-[--color-graphite-700]">
+            <Filter className="h-4 w-4 text-[--color-amber-signal]" />
+            <span className="font-display text-sm font-semibold uppercase tracking-[0.1em]">Filtres</span>
+          </div>
+
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {[
+              { label: '7 j', days: 7 },
+              { label: '30 j', days: 30 },
+              { label: '90 j', days: 90 },
+              { label: 'Tout', days: null },
+            ].map((chip) => (
+              <button
+                key={chip.label}
+                onClick={() => applyQuickRange(chip.days)}
+                className="rounded-full border border-[--color-graphite-200] bg-white px-3 py-1.5 text-xs font-medium text-[--color-graphite-600] transition-colors hover:border-[--color-amber-signal] hover:text-[--color-graphite-900]"
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid w-full grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+            <Field label="Du">
+              <input type="date" value={filters.dateFrom} onChange={(e) => update({ dateFrom: e.target.value })} className={inputClass} />
+            </Field>
+            <Field label="Au">
+              <input type="date" value={filters.dateTo} onChange={(e) => update({ dateTo: e.target.value })} className={inputClass} />
+            </Field>
+            <Field label="Équipement">
+              <select value={filters.equipmentId} onChange={(e) => update({ equipmentId: e.target.value })} className={inputClass}>
+                <option value="all">Tous</option>
+                {EQUIPMENT_DEFINITIONS.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </Field>
+            {role === 'admin' && (
+              <Field label="Technicien">
+                <select value={filters.technicianId} onChange={(e) => update({ technicianId: e.target.value })} className={inputClass}>
+                  <option value="all">Tous</option>
+                  {technicianOptions.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
+            <Field label="Statut">
+              <select value={filters.status} onChange={(e) => update({ status: e.target.value as Filters['status'] })} className={inputClass}>
+                <option value="all">Tous</option>
+                <option value="normal">Normal</option>
+                <option value="warning">Alerte</option>
+                <option value="critical">Critique</option>
+              </select>
+            </Field>
+          </div>
+
+          <div className="flex w-full items-center justify-between gap-3 border-t border-[--color-graphite-100] pt-3">
+            <span className="inline-flex items-center gap-1.5 text-xs text-[--color-graphite-500]">
+              <CalendarDays className="h-3.5 w-3.5" /> {rangeLabel} · <strong className="font-semibold text-[--color-graphite-900]">{filtered.length}</strong> inspection(s)
+            </span>
+            {isFiltered && (
+              <Button size="sm" variant="ghost" onClick={() => setFilters(EMPTY_FILTERS)}>
+                <RotateCcw className="h-3.5 w-3.5" /> Réinitialiser
+              </Button>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      {/* KPI row */}
+      <div className="stagger grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <KpiCard style={{ '--i': 0 } as React.CSSProperties} icon={<Activity className="h-5 w-5" />} label="Inspections" value={kpis.total} tint="#2563EB" />
+        <KpiCard style={{ '--i': 1 } as React.CSSProperties} icon={<CheckCircle2 className="h-5 w-5" />} label="Normales" value={kpis.normal} tint={statusColor('normal')} percent={kpis.total ? Math.round((kpis.normal / kpis.total) * 100) : 0} />
+        <KpiCard style={{ '--i': 2 } as React.CSSProperties} icon={<AlertTriangle className="h-5 w-5" />} label="Alertes" value={kpis.warning} tint={statusColor('warning')} percent={kpis.total ? Math.round((kpis.warning / kpis.total) * 100) : 0} />
+        <KpiCard style={{ '--i': 3 } as React.CSSProperties} icon={<XCircle className="h-5 w-5" />} label="Critiques" value={kpis.critical} tint={statusColor('critical')} percent={kpis.total ? Math.round((kpis.critical / kpis.total) * 100) : 0} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.45fr_0.85fr]">
+      {/* Trend area + distribution donut */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.5fr_0.85fr]">
         <Card className="overflow-hidden">
-          <CardHeader
-            title="Total inspections this month"
-            subtitle="Statut global par jour d'inspection"
-            action={<span className="rounded-full bg-[--color-graphite-50] px-3 py-1 text-xs font-medium text-[--color-graphite-500]">This year</span>}
-          />
-          <div className="h-88 p-5 pt-4 chart-shadow">
-            {statusBreakdownByDay.length === 0 ? (
+          <CardHeader title="Statut global par jour" subtitle="Répartition des inspections normales / alerte / critique" />
+          <div className="h-80 p-5 pt-4">
+            {statusByDay.length === 0 ? (
               <EmptyState />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={statusBreakdownByDay} margin={{ left: 0, right: 12, top: 20, bottom: 0 }}>
+                <AreaChart data={statusByDay} margin={{ left: -8, right: 12, top: 12, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="area-normal" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={statusColor('normal')} stopOpacity={0.42} />
-                      <stop offset="95%" stopColor={statusColor('normal')} stopOpacity={0.04} />
-                    </linearGradient>
-                    <linearGradient id="area-warning" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={statusColor('warning')} stopOpacity={0.35} />
-                      <stop offset="95%" stopColor={statusColor('warning')} stopOpacity={0.04} />
-                    </linearGradient>
-                    <linearGradient id="area-critical" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={statusColor('critical')} stopOpacity={0.34} />
-                      <stop offset="95%" stopColor={statusColor('critical')} stopOpacity={0.04} />
-                    </linearGradient>
+                    {(['normal', 'warning', 'critical'] as const).map((s) => (
+                      <linearGradient key={s} id={`area-${s}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={statusColor(s)} stopOpacity={0.4} />
+                        <stop offset="95%" stopColor={statusColor(s)} stopOpacity={0.04} />
+                      </linearGradient>
+                    ))}
                   </defs>
                   <CartesianGrid strokeDasharray="4 4" stroke="#EDF0F3" vertical={false} />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="#6B7A8F" axisLine={false} tickLine={false} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="#6B7A8F" axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: 18, border: '1px solid #DCE1E7', boxShadow: '0 12px 32px rgba(18,24,31,0.12)' }}
-                    formatter={(value, name) => [value, name]}
-                    labelFormatter={(label) => `Date ${label}`}
-                  />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="#6B7A8F" axisLine={false} tickLine={false} width={32} />
+                  <Tooltip contentStyle={tooltipStyle} labelFormatter={(l) => `Date ${l}`} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   <Area type="monotone" dataKey="normal" name="Normal" stackId="1" stroke={statusColor('normal')} fill="url(#area-normal)" strokeWidth={2} />
                   <Area type="monotone" dataKey="warning" name="Alerte" stackId="1" stroke={statusColor('warning')} fill="url(#area-warning)" strokeWidth={2} />
                   <Area type="monotone" dataKey="critical" name="Critique" stackId="1" stroke={statusColor('critical')} fill="url(#area-critical)" strokeWidth={2} />
-                  {latestPoint && (
-                    <ReferenceDot
-                      x={latestPoint.label}
-                      y={latestPoint.total}
-                      r={6}
-                      fill={statusColor('normal')}
-                      stroke="#fff"
-                      strokeWidth={2}
-                      label={{ value: `${latestPoint.total} · Last month`, position: 'top', fill: '#2E9E5B', fontSize: 11, fontWeight: 700 }}
-                    />
-                  )}
                 </AreaChart>
               </ResponsiveContainer>
             )}
           </div>
         </Card>
 
-        <div className="grid gap-4">
-          <Card>
-            <CardHeader title="Status distribution" subtitle="Toutes lectures d'équipement" />
-            <div className="relative h-88 p-5 pt-4">
-              {distribution.length === 0 ? (
-                <EmptyState />
-              ) : (
-                <>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={distribution} dataKey="value" nameKey="name" innerRadius={62} outerRadius={92} paddingAngle={4}>
-                        {distribution.map((d) => (
-                          <Cell key={d.name} fill={d.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                      <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <div className="text-center">
-                      <p className="font-display text-3xl font-semibold text-[--color-graphite-900]">{kpis.total}</p>
-                      <p className="text-xs uppercase tracking-wide text-[--color-graphite-500]">Lectures</p>
-                    </div>
+        <Card>
+          <CardHeader title="Répartition des lectures" subtitle="Par statut d'équipement" />
+          <div className="relative h-80 p-5 pt-4">
+            {distribution.length === 0 ? (
+              <EmptyState />
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={distribution} dataKey="value" nameKey="name" innerRadius={64} outerRadius={94} paddingAngle={3} stroke="#fff" strokeWidth={2}>
+                      {distribution.map((d) => (
+                        <Cell key={d.name} fill={d.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="pointer-events-none absolute inset-0 top-[-2.2rem] flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="font-display text-3xl font-semibold text-[--color-graphite-900]">{totalReadings}</p>
+                    <p className="text-xs uppercase tracking-wide text-[--color-graphite-500]">Lectures</p>
                   </div>
-                </>
-              )}
-            </div>
-          </Card>
-        </div>
+                </div>
+              </>
+            )}
+          </div>
+        </Card>
       </div>
 
+      {/* Equipment health matrix */}
+      <Card>
+        <CardHeader title="État actuel des équipements" subtitle="Dernier statut connu — cliquez pour le détail des paramètres" action={<span className="inline-flex items-center gap-1.5 rounded-full bg-[--color-graphite-50] px-3 py-1 text-xs font-medium text-[--color-graphite-500]"><Gauge className="h-3.5 w-3.5" />{equipmentHealth.length} équipements</span>} />
+        <div className="stagger grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3">
+          {equipmentHealth.map((eq, i) => (
+            <button
+              key={eq.id}
+              onClick={() => onSelectEquipment?.(eq.id)}
+              style={{ '--i': i } as React.CSSProperties}
+              className="group flex items-center justify-between gap-3 rounded-2xl border border-[--color-graphite-100] bg-white p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[--color-amber-signal] hover:shadow-[0_12px_28px_rgba(18,24,31,0.08)]"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <StatusDot status={eq.status} pulse />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-[--color-graphite-900]">{eq.name}</p>
+                  <p className="truncate text-xs text-[--color-graphite-500]">
+                    {eq.date ? `Dernière lecture ${format(parseISO(eq.date), 'dd/MM/yyyy')}` : 'Aucune donnée'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <StatusBadge status={eq.status} compact />
+                <ArrowRight className="h-4 w-4 text-[--color-graphite-300] transition-all group-hover:translate-x-0.5 group-hover:text-[--color-amber-signal]" />
+              </div>
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      {/* Watch list */}
+      <Card>
+        <CardHeader title="Équipements à surveiller" subtitle="Dernier statut anormal connu sur la période filtrée" />
+        {watchList.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 p-10 text-center">
+            <CheckCircle2 className="h-7 w-7 text-[--color-status-normal]" />
+            <p className="text-sm font-medium text-[--color-graphite-700]">Aucun équipement en alerte ou critique</p>
+            <p className="text-xs text-[--color-graphite-500]">Tout est dans les normes sur la période sélectionnée.</p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-[--color-graphite-100]">
+            {watchList.map((item) => (
+              <li key={item.id} className="flex items-center justify-between gap-4 px-6 py-4 transition-colors hover:bg-[--color-graphite-50]">
+                <div className="flex items-center gap-3">
+                  <StatusDot status={item.status} pulse />
+                  <div>
+                    <p className="text-sm font-medium text-[--color-graphite-900]">{item.name}</p>
+                    {item.message && <p className="text-xs text-[--color-graphite-500]">{item.message}</p>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {item.date && <span className="text-xs text-[--color-graphite-500]">{format(parseISO(item.date), 'dd/MM/yyyy')}</span>}
+                  <StatusBadge status={item.status} compact />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      {/* Per-equipment parameter trends */}
       <Card>
         <CardHeader
-          title="Évolution des paramètres par équipement"
-          subtitle="Suivi des valeurs enregistrées sur les 7 ou 30 derniers jours"
+          title="Évolution des paramètres"
+          subtitle={`Valeurs enregistrées sur les ${trendRange === 'week' ? '7' : '30'} derniers jours`}
           action={
-            <div className="flex items-center gap-2 rounded-full border border-[--color-graphite-200] bg-[--color-graphite-50] p-1 text-xs font-medium text-[--color-graphite-500]">
-              <button
-                type="button"
-                onClick={() => setTrendRange('week')}
-                className={`rounded-full px-3 py-1.5 transition-colors ${trendRange === 'week' ? 'bg-white text-[--color-graphite-900] shadow-sm' : 'hover:text-[--color-graphite-900]'}`}
-              >
-                7 jours
-              </button>
-              <button
-                type="button"
-                onClick={() => setTrendRange('month')}
-                className={`rounded-full px-3 py-1.5 transition-colors ${trendRange === 'month' ? 'bg-white text-[--color-graphite-900] shadow-sm' : 'hover:text-[--color-graphite-900]'}`}
-              >
-                30 jours
-              </button>
+            <div className="flex items-center gap-1 rounded-full border border-[--color-graphite-200] bg-[--color-graphite-50] p-1 text-xs font-medium text-[--color-graphite-500]">
+              {(['week', 'month'] as const).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setTrendRange(r)}
+                  className={`rounded-full px-3 py-1.5 transition-colors ${trendRange === r ? 'bg-white text-[--color-graphite-900] shadow-sm' : 'hover:text-[--color-graphite-900]'}`}
+                >
+                  {r === 'week' ? '7 jours' : '30 jours'}
+                </button>
+              ))}
             </div>
           }
         />
-        <div className="grid grid-cols-1 gap-4 p-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 p-5 lg:grid-cols-2">
           {equipmentTrends.map(({ definition, data, chartableFields }) => (
             <button
               key={definition.id}
               type="button"
               onClick={() => onSelectEquipment?.(definition.id)}
-              className="group rounded-2xl border border-[--color-graphite-100] bg-[--color-graphite-50]/60 p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[--color-amber-signal] hover:bg-white"
-              data-equipment-id={definition.id}
+              className="group rounded-2xl border border-[--color-graphite-100] bg-[--color-graphite-50]/50 p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[--color-amber-signal] hover:bg-white"
             >
-              <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-display text-sm font-semibold uppercase tracking-[0.12em] text-[--color-graphite-900]">{definition.name}</p>
+                  <p className="font-display text-sm font-semibold uppercase tracking-[0.1em] text-[--color-graphite-900]">{definition.name}</p>
                   <p className="text-xs text-[--color-graphite-500]">
-                    {chartableFields.length > 0 ? `${chartableFields.length} paramètre(s) suivi(s)` : 'Aucune valeur numérique sur la période'}
-                    {latestInspectionByEquipment.get(definition.id) && ` · Dernière lecture ${format(parseISO(latestInspectionByEquipment.get(definition.id)!), 'dd/MM/yyyy')}`}
+                    {chartableFields.length > 0 ? `${chartableFields.length} paramètre(s) suivi(s)` : 'Aucune valeur numérique'}
                   </p>
                 </div>
                 <span className="flex items-center gap-1 text-xs font-medium text-[--color-graphite-500] transition-colors group-hover:text-[--color-graphite-900]">
-                  Détails
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  Détails <ArrowRight className="h-3.5 w-3.5" />
                 </span>
               </div>
-              <div className="h-64">
+              <div className="h-56">
                 {data.length === 0 || chartableFields.length === 0 ? (
                   <EmptyState message="Enregistrez des valeurs numériques pour alimenter ce graphique." />
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={data}>
-                      <defs>
-                        <linearGradient id={`trend-${definition.id}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={CHART_GRADIENT} stopOpacity={0.28} />
-                          <stop offset="95%" stopColor={CHART_GRADIENT} stopOpacity={0.02} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#EDF0F3" />
-                      <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="#6B7A8F" />
-                      <YAxis allowDecimals tick={{ fontSize: 11 }} stroke="#6B7A8F" width={44} />
-                      <Tooltip
-                        contentStyle={{ borderRadius: 18, border: '1px solid #DCE1E7', boxShadow: '0 12px 32px rgba(18,24,31,0.12)' }}
-                        labelFormatter={(label) => `Date: ${label}`}
-                      />
-                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <LineChart data={data} margin={{ left: -12, right: 8, top: 6, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#EDF0F3" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="#6B7A8F" axisLine={false} tickLine={false} />
+                      <YAxis allowDecimals tick={{ fontSize: 11 }} stroke="#6B7A8F" width={40} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={tooltipStyle} labelFormatter={(l) => `Date ${l}`} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
                       {chartableFields.map((field, index) => (
                         <Line
                           key={field.id}
                           type="monotone"
                           dataKey={field.id}
                           name={`${field.label}${field.unit ? ` (${field.unit})` : ''}`}
-                          stroke={TREND_COLORS[index % TREND_COLORS.length]}
+                          stroke={SERIES_COLORS[index % SERIES_COLORS.length]}
                           strokeWidth={2.5}
-                          dot={false}
+                          dot={{ r: 2.5 }}
+                          activeDot={{ r: 5 }}
                           connectNulls
                         />
                       ))}
@@ -456,38 +469,59 @@ export function Dashboard({
           ))}
         </div>
       </Card>
-
-      <Card>
-        <CardHeader title="Équipements à surveiller" subtitle="Dernier statut anormal connu, par équipement" />
-        {criticalEquipment.length === 0 ? (
-          <div className="p-6">
-            <EmptyState message="Aucun équipement en alerte ou critique." />
-          </div>
-        ) : (
-          <ul className="divide-y divide-[--color-graphite-100]">
-            {criticalEquipment.map((item) => (
-              <li key={item.equipmentId} className="flex items-center justify-between gap-4 px-6 py-4">
-                <div className="flex items-center gap-3">
-                  <StatusDot status={item.status} pulse />
-                  <div>
-                    <p className="text-sm font-medium text-[--color-graphite-900]">{item.name}</p>
-                    {item.message && <p className="text-xs text-[--color-graphite-500]">{item.message}</p>}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-[--color-graphite-500]">{format(parseISO(item.date), 'dd/MM/yyyy')}</span>
-                  <StatusBadge status={item.status} compact />
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
     </div>
   )
 }
 
-function EmptyState({ message = "Aucune donnée pour l'instant — enregistrez une inspection pour l'alimenter." }: { message?: string }) {
+const inputClass =
+  'w-full rounded-xl border border-[--color-graphite-200] bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[--color-amber-signal]'
+
+const tooltipStyle = { borderRadius: 16, border: '1px solid #DCE1E7', boxShadow: '0 12px 32px rgba(18,24,31,0.12)', fontSize: 12 } as const
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[--color-graphite-400]">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function KpiCard({
+  icon,
+  label,
+  value,
+  tint,
+  percent,
+  style,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: number
+  tint: string
+  percent?: number
+  style?: React.CSSProperties
+}) {
+  const animated = useCountUp(value)
+  return (
+    <Card className="p-5" style={style}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: `${tint}1A`, color: tint }}>
+          {icon}
+        </div>
+        {percent !== undefined && (
+          <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ backgroundColor: `${tint}14`, color: tint }}>
+            {percent}%
+          </span>
+        )}
+      </div>
+      <p className="mt-4 font-display text-3xl font-semibold tabular-nums text-[--color-graphite-900]">{animated.toLocaleString('fr-FR')}</p>
+      <p className="mt-1 text-xs uppercase tracking-wide text-[--color-graphite-500]">{label}</p>
+    </Card>
+  )
+}
+
+function EmptyState({ message = 'Aucune donnée sur la période — ajustez les filtres ou enregistrez une inspection.' }: { message?: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-[--color-graphite-500]">
       <Activity className="h-6 w-6 text-[--color-graphite-200]" />
