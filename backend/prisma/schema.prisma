@@ -12,22 +12,57 @@ enum Role {
 }
 
 model User {
-  id            String               @id
-  email         String               @unique
-  name          String
-  role          Role                 @default(TECHNICIAN)
-  createdAt     DateTime             @default(now())
-  assignments   EquipmentAssignment[]
-  inspections   Inspection[]
-  notifications Notification[]
+  id              String                @id
+  email           String                @unique
+  name            String
+  position        String? // job title, e.g. "Coordinateur", "Responsable maintenance"
+  role            Role                  @default(TECHNICIAN)
+  createdAt       DateTime              @default(now())
+  assignments     EquipmentAssignment[]
+  inspections     Inspection[]
+  notifications   Notification[]
+  maintenanceLogs MaintenanceLog[]
 }
 
 model Equipment {
-  id            String               @id
-  name          String
-  assignments   EquipmentAssignment[]
-  readings      EquipmentReading[]
-  notifications Notification[]
+  id              String                @id
+  name            String
+  assignments     EquipmentAssignment[]
+  readings        EquipmentReading[]
+  notifications   Notification[]
+  schedule        MaintenanceSchedule?
+  maintenanceLogs MaintenanceLog[]
+}
+
+// Periodic servicing schedule per hour-tracked equipment (separate from the
+// status-alert Notification system). One row per tracked equipment.
+model MaintenanceSchedule {
+  id                      String    @id @default(cuid())
+  equipment               Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  equipmentId             String    @unique
+  intervalHours           Int? // null if not hour-tracked
+  intervalDays            Int? // null unless equipment has a calendar rule (groupe_electrogene: 365)
+  warningHoursBefore      Int
+  warningDaysBefore       Int? // advance window for the calendar deadline (groupe_electrogene: 14)
+  lastServiceMeterReading Float     @default(0)
+  lastServiceDate         DateTime  @default(now())
+  hourReminderSent        Boolean   @default(false)
+  dayReminderSent         Boolean   @default(false)
+  updatedAt               DateTime  @updatedAt
+}
+
+// Audit trail of servicing events (who reset the counter, at what meter reading).
+model MaintenanceLog {
+  id                    String    @id @default(cuid())
+  equipment             Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  equipmentId           String
+  performedBy           User      @relation(fields: [performedById], references: [id])
+  performedById         String
+  meterReadingAtService Float
+  serviceDate           DateTime  @default(now())
+  createdAt             DateTime  @default(now())
+
+  @@index([equipmentId, serviceDate])
 }
 
 model Notification {

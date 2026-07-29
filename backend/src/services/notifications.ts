@@ -1,5 +1,6 @@
 import { prisma } from '../db'
 import { sendCriticalAlertEmail } from './email'
+import { getAdminUsers } from './recipients'
 
 // Shape of a field reading stored in EquipmentReading.fields (JSON).
 interface FieldReading {
@@ -58,10 +59,7 @@ function buildMessage(equipmentName: string, status: string, fields: FieldReadin
  * and never bubble up — the in-app notifications must survive regardless.
  */
 export async function notifyOnInspection(inspection: NotifiableInspection): Promise<void> {
-  const admins = await prisma.user.findMany({
-    where: { role: 'ADMIN' },
-    select: { id: true, email: true, name: true, role: true },
-  })
+  const admins = await getAdminUsers()
   const equipment = await prisma.equipment.findMany({ select: { id: true, name: true } })
   const equipmentName = new Map(equipment.map((e) => [e.id, e.name]))
 

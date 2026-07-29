@@ -82,6 +82,76 @@ export async function sendCriticalAlertEmail(payload: CriticalEmailPayload): Pro
   return data?.id ?? ''
 }
 
+export interface MaintenanceEmailPayload {
+  to: string
+  equipmentName: string
+  kind: 'hour' | 'day'
+  currentMeter: number | null
+  nextDueMeter: number | null
+  approxDate: string | null // projected service date (hour) or calendar due date (day), yyyy-MM-dd
+  lastServiceMeter: number
+  lastServiceDate: string
+}
+
+/** Sends a periodic-maintenance reminder (separate from status alerts). Throws on API failure. */
+export async function sendMaintenanceReminderEmail(payload: MaintenanceEmailPayload): Promise<string> {
+  const api = client()
+  if (!api) throw new Error('RESEND_API_KEY not configured')
+
+  const appUrl = (process.env.FRONTEND_URL ?? 'http://localhost:5173').replace(/\/$/, '')
+  const link = `${appUrl}/?tab=maintenance`
+
+  const reason =
+    payload.kind === 'hour'
+      ? `Le compteur approche de l'échéance d'entretien${payload.nextDueMeter != null ? ` (prochaine échéance : ${payload.nextDueMeter} h)` : ''}.`
+      : `L'échéance calendaire d'entretien (365 jours) approche.`
+
+  const lines: string[] = []
+  if (payload.currentMeter != null) lines.push(`Compteur actuel : ${payload.currentMeter} h`)
+  if (payload.nextDueMeter != null) lines.push(`Prochaine échéance : ${payload.nextDueMeter} h`)
+  if (payload.approxDate) lines.push(`Date d'entretien approximative : ${payload.approxDate}`)
+  lines.push(`Dernier entretien : ${payload.lastServiceMeter} h le ${payload.lastServiceDate}`)
+
+  const text = [
+    `RAPPEL D'ENTRETIEN — ${payload.equipmentName}`,
+    ``,
+    reason,
+    ``,
+    ...lines.map((l) => `  • ${l}`),
+    ``,
+    `Ouvrir la maintenance : ${link}`,
+    ``,
+    `— Contrôle journalier des équipements, SBM Tunisie`,
+  ].join('\n')
+
+  const html = `
+    <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#17202E">
+      <div style="background:#2563EB;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0">
+        <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.85">Rappel d'entretien</div>
+        <div style="font-size:20px;font-weight:700;margin-top:2px">${escapeHtml(payload.equipmentName)}</div>
+      </div>
+      <div style="border:1px solid #EDF0F3;border-top:none;border-radius:0 0 12px 12px;padding:20px">
+        <p style="margin:0 0 16px">${escapeHtml(reason)}</p>
+        <div style="background:#EEF4FF;border-radius:10px;padding:12px 14px;margin-bottom:16px">
+          <ul style="margin:0;padding-left:18px;font-size:14px">
+            ${lines.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}
+          </ul>
+        </div>
+        <a href="${link}" style="display:inline-block;background:#2563EB;color:#fff;text-decoration:none;padding:10px 18px;border-radius:10px;font-weight:600;font-size:14px">Ouvrir la maintenance</a>
+      </div>
+    </div>`
+
+  const { data, error } = await api.emails.send({
+    from: FROM,
+    to: payload.to,
+    subject: `[Entretien à prévoir] ${payload.equipmentName}`,
+    text,
+    html,
+  })
+  if (error) throw new Error(`Resend error: ${error.message ?? JSON.stringify(error)}`)
+  return data?.id ?? ''
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
 }

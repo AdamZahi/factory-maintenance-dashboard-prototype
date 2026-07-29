@@ -98,24 +98,12 @@ function applyRule(rule: ValidationRule, value: number): { status: StatusLevel; 
   return { status: 'normal' }
 }
 
-/** Evaluate an entire equipment's set of field values, including maintenance-interval alerts. */
+/** Evaluate an entire equipment's set of field values against their rules. */
 export function evaluateEquipment(
   definition: EquipmentDefinition,
   values: Record<string, number | string | null>
 ): EquipmentReading {
   const fields = definition.fields.map((field) => evaluateField(field, values[field.id] ?? null))
-
-  // Maintenance interval check (runs on top of the hour-counter field's own reading)
-  if (definition.hourFieldId && definition.maintenanceIntervalHours) {
-    const hourReading = fields.find((f) => f.fieldId === definition.hourFieldId)
-    const hours = typeof hourReading?.value === 'number' ? hourReading.value : parseFirstNumber(String(hourReading?.value ?? ''))
-    if (hours !== null && hours % definition.maintenanceIntervalHours < definition.maintenanceIntervalHours * 0.02) {
-      const idx = fields.findIndex((f) => f.fieldId === definition.hourFieldId)
-      if (idx >= 0 && fields[idx].status !== 'critical') {
-        fields[idx] = { ...fields[idx], status: 'warning', message: `Entretien dû (tous les ${definition.maintenanceIntervalHours}h)` }
-      }
-    }
-  }
 
   const status = fields.reduce<StatusLevel>((acc, f) => worstStatus(acc, f.status === 'unknown' ? 'unknown' : f.status), 'unknown')
   // Equipment is "normal" only if it has at least one recorded field and no warning/critical

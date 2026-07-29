@@ -9,28 +9,34 @@ import { AdminAssignments } from './components/AdminAssignments'
 import { Sidebar, type NavItem } from './components/layout/Sidebar'
 import { SettingsPanel } from './components/SettingsPanel'
 import { NotificationBell } from './components/NotificationBell'
+import { MaintenancePanel } from './components/MaintenancePanel'
+import { MonitoringPage } from './components/MonitoringPage'
 import { ToastProvider } from './components/ui/Toast'
 import { ConfirmProvider } from './components/ui/ConfirmDialog'
 import { useInspections } from './hooks/useData'
 import { usePreferences } from './hooks/usePreferences'
 import { setAuthTokenGetter } from './lib/storage'
-import { LayoutDashboard, ClipboardList, History as HistoryIcon, FileSpreadsheet, Users, Search, Menu } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, History as HistoryIcon, FileSpreadsheet, Users, Wrench, MonitorDot, Search, Menu } from 'lucide-react'
 
-type Tab = 'dashboard' | 'inspection' | 'history' | 'excel' | 'assignments'
+type Tab = 'dashboard' | 'monitoring' | 'inspection' | 'history' | 'maintenance' | 'excel' | 'assignments'
 type Role = 'admin' | 'technician'
 
 const ALL_TABS: (NavItem & { adminOnly?: boolean })[] = [
   { id: 'dashboard', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" /> },
+  { id: 'monitoring', label: 'Supervision', icon: <MonitorDot className="h-4 w-4" /> },
   { id: 'inspection', label: 'Inspection du jour', icon: <ClipboardList className="h-4 w-4" /> },
   { id: 'history', label: 'Historique', icon: <HistoryIcon className="h-4 w-4" /> },
+  { id: 'maintenance', label: 'Entretien', icon: <Wrench className="h-4 w-4" /> },
   { id: 'excel', label: 'Import / Export', icon: <FileSpreadsheet className="h-4 w-4" />, adminOnly: true },
   { id: 'assignments', label: 'Affectations', icon: <Users className="h-4 w-4" />, adminOnly: true },
 ]
 
 const TAB_TITLES: Record<Tab, string> = {
   dashboard: 'Tableau de bord',
+  monitoring: 'Supervision',
   inspection: 'Inspection du jour',
   history: 'Historique',
+  maintenance: 'Entretien périodique',
   excel: 'Import / Export',
   assignments: 'Affectations des équipements',
 }
@@ -88,18 +94,25 @@ function AuthenticatedApp() {
     setMobileNavOpen(false)
   }
 
-  // Email links point at /?inspection=<id> — honor it once on mount.
+  // Email links point at /?inspection=<id> or /?tab=maintenance — honor once on mount.
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get('inspection')
+    const params = new URLSearchParams(window.location.search)
+    const id = params.get('inspection')
+    const targetTab = params.get('tab')
     if (id) {
       focusInspection(id)
-      window.history.replaceState({}, '', window.location.pathname)
+    } else if (targetTab === 'maintenance') {
+      setSelectedEquipmentId(null)
+      setTab('maintenance')
     }
+    if (id || targetTab) window.history.replaceState({}, '', window.location.pathname)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const displayName = user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? 'Utilisateur'
   const roleLabel = role === 'admin' ? 'Administrateur' : 'Technicien'
+  const position = (user?.publicMetadata?.position as string | undefined) ?? ''
+  const roleSubtitle = position || roleLabel
   const email = user?.primaryEmailAddress?.emailAddress ?? ''
 
   const openEquipmentDetails = (equipmentId: string) => {
@@ -125,7 +138,7 @@ function AuthenticatedApp() {
         onToggleCollapse={() => toggle('sidebarCollapsed')}
         mobileOpen={mobileNavOpen}
         onCloseMobile={() => setMobileNavOpen(false)}
-        user={{ name: displayName, roleLabel, imageUrl: user?.hasImage ? user.imageUrl : undefined }}
+        user={{ name: displayName, roleLabel: roleSubtitle, imageUrl: user?.hasImage ? user.imageUrl : undefined }}
         onOpenSettings={() => setSettingsOpen(true)}
         onSignOut={() => signOut()}
       />
@@ -167,10 +180,14 @@ function AuthenticatedApp() {
               <EquipmentParametersDetails equipmentId={selectedEquipmentId} inspections={inspections} onBack={closeEquipmentDetails} />
             ) : tab === 'dashboard' ? (
               <Dashboard inspections={inspections} role={role} onSelectEquipment={openEquipmentDetails} />
+            ) : tab === 'monitoring' ? (
+              <MonitoringPage />
             ) : tab === 'inspection' ? (
               <InspectionForm role={role} />
             ) : tab === 'history' ? (
               <History inspections={inspections} focusInspectionId={historyFocusId} />
+            ) : tab === 'maintenance' ? (
+              <MaintenancePanel />
             ) : tab === 'excel' && role === 'admin' ? (
               <ImportExport />
             ) : tab === 'assignments' && role === 'admin' ? (
@@ -185,7 +202,7 @@ function AuthenticatedApp() {
         onClose={() => setSettingsOpen(false)}
         prefs={prefs}
         onToggle={toggle}
-        user={{ name: displayName, email, roleLabel }}
+        user={{ name: displayName, email, roleLabel: position ? `${position} · ${roleLabel}` : roleLabel }}
       />
     </div>
   )

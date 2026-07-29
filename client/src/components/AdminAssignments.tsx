@@ -7,6 +7,7 @@ import {
   deleteAssignment,
   fetchUsers,
   setUserRole,
+  setUserPosition,
   type AppUser,
 } from '../hooks/useData'
 import { useToast } from './ui/Toast'
@@ -86,6 +87,21 @@ export function AdminAssignments() {
     }
   }
 
+  const savePosition = async (user: AppUser, position: string) => {
+    if ((position.trim() || null) === (user.position ?? null)) return // unchanged
+    markPending(`pos:${user.id}`, true)
+    try {
+      await setUserPosition(user.id, position.trim())
+      await loadUsers()
+      toast.success('Fonction mise à jour', `${user.name} — ${position.trim() || 'aucune fonction'}.`)
+    } catch (err) {
+      console.error('[admin] set position failed', err)
+      toast.error('Échec de la mise à jour', 'La fonction n’a pas pu être enregistrée.')
+    } finally {
+      markPending(`pos:${user.id}`, false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <Card>
@@ -119,19 +135,25 @@ export function AdminAssignments() {
               </p>
             ) : (
               users.map((u) => (
-              <div key={u.id} className="flex items-center justify-between gap-3 p-4">
+              <div key={u.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
                 <div className="flex items-center gap-3">
                   <span className={`flex h-9 w-9 items-center justify-center rounded-full ${u.role === 'ADMIN' ? 'bg-[--color-status-normal-bg] text-[--color-status-normal]' : 'bg-[--color-graphite-50] text-[--color-graphite-500]'}`}>
                     {u.role === 'ADMIN' ? <ShieldCheck className="h-6 w-6" /> : <User className="h-6 w-6" />}
                   </span>
                   <div>
                     <p className="text-sm font-medium text-[--color-graphite-900]">{u.name}</p>
-                    <p className="text-xs text-[--color-graphite-500]">{u.email} · {u.role === 'ADMIN' ? 'Administrateur' : 'Technicien'}</p>
+                    <p className="text-xs text-[--color-graphite-500]">
+                      {u.email} · {u.role === 'ADMIN' ? 'Administrateur' : 'Technicien'}
+                      {u.position ? ` · ${u.position}` : ''}
+                    </p>
                   </div>
                 </div>
-                <Button size="sm" variant="ghost" className="bg-graphite-500 hover:bg-graphite-700 text-white cursor-pointer" disabled={pending.has(`role:${u.id}`)} onClick={() => changeRole(u)}>
-                  {u.role === 'ADMIN' ? 'Rétrograder en technicien' : 'Promouvoir admin'}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <PositionEditor user={u} pending={pending.has(`pos:${u.id}`)} onSave={(v) => savePosition(u, v)} />
+                  <Button size="sm" variant="ghost" className="bg-graphite-500 hover:bg-graphite-700 text-white cursor-pointer" disabled={pending.has(`role:${u.id}`)} onClick={() => changeRole(u)}>
+                    {u.role === 'ADMIN' ? 'Rétrograder en technicien' : 'Promouvoir admin'}
+                  </Button>
+                </div>
               </div>
               ))
             )}
@@ -190,6 +212,27 @@ export function AdminAssignments() {
           )}
         </div>
       </Card>
+    </div>
+  )
+}
+
+// Inline job-title editor. Saves on blur / Enter when the value changed.
+function PositionEditor({ user, pending, onSave }: { user: AppUser; pending: boolean; onSave: (value: string) => void }) {
+  const [value, setValue] = useState(user.position ?? '')
+  useEffect(() => setValue(user.position ?? ''), [user.position])
+  return (
+    <div className="relative">
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => onSave(value)}
+        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+        placeholder="Fonction…"
+        disabled={pending}
+        className="w-44 rounded-lg border border-[--color-graphite-200] bg-white px-3 py-1.5 pr-7 text-xs outline-none transition-colors focus:border-[--color-brand-500] disabled:opacity-50"
+        aria-label={`Fonction de ${user.name}`}
+      />
+      {pending && <Loader2 className="absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-[--color-graphite-400]" />}
     </div>
   )
 }

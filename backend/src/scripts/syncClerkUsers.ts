@@ -22,11 +22,12 @@ async function main() {
       (u.publicMetadata?.role as string | undefined)?.toLowerCase() === 'admin'
         ? 'ADMIN'
         : 'TECHNICIAN'
+    const position = (u.publicMetadata?.position as string | undefined) ?? null
 
     await prisma.user.upsert({
       where: { id: u.id },
-      update: { email, name, role },
-      create: { id: u.id, email, name, role },
+      update: { email, name, role, position },
+      create: { id: u.id, email, name, role, position },
     })
     console.log(`  synced ${name} <${email}> [${role}]`)
   }

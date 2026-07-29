@@ -46,8 +46,6 @@ export interface EquipmentDefinition {
   id: EquipmentId
   name: string
   fields: EquipmentField[]
-  maintenanceIntervalHours?: number
-  hourFieldId?: FieldId // which field tracks running hours, for maintenance-interval alerts
 }
 
 export type StatusLevel = 'normal' | 'warning' | 'critical' | 'unknown'

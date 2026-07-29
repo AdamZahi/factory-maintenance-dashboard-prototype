@@ -58,11 +58,12 @@ export async function requireUser(req: Request, res: Response, next: NextFunctio
         clerkUser.username ||
         email
       const role = (clerkUser.publicMetadata?.role as Role | undefined) ?? 'TECHNICIAN'
+      const position = (clerkUser.publicMetadata?.position as string | undefined) ?? null
 
       user = await prisma.user.upsert({
         where: { id: userId },
         update: {},
-        create: { id: userId, email, name, role },
+        create: { id: userId, email, name, role, position },
       })
     }
 

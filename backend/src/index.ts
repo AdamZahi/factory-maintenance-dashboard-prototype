@@ -8,6 +8,7 @@ import { techniciansRouter } from './routes/technicians'
 import { assignmentsRouter } from './routes/assignments'
 import { inspectionsRouter } from './routes/inspections'
 import { notificationsRouter } from './routes/notifications'
+import { startMaintenanceCron } from './services/maintenanceCron'
 
 const app = express()
 const port = Number(process.env.PORT ?? 4000)
@@ -38,4 +39,5 @@ app.use('/api/notifications', notificationsRouter)
 
 app.listen(port, () => {
   console.log(`Backend listening on http://localhost:${port}`)
+  startMaintenanceCron()
 })

@@ -36,8 +36,6 @@ export const EQUIPMENT_DEFINITIONS: EquipmentDefinition[] = [
   {
     id: 'compresseur',
     name: 'Compresseur',
-    hourFieldId: 'compteur',
-    maintenanceIntervalHours: 2000,
     fields: [
       { id: 'compteur', label: 'Compteur', unit: 'h', kind: 'number', recordedOn: [0] },
       { id: 'temperature', label: 'Température', unit: '°C', kind: 'number', recordedOn: [0], rule: { min: 75, max: 90 } },
@@ -55,8 +53,6 @@ export const EQUIPMENT_DEFINITIONS: EquipmentDefinition[] = [
   {
     id: 'chariot_elevateur',
     name: 'Chariot élévateur',
-    hourFieldId: 'compteur',
-    maintenanceIntervalHours: 250,
     fields: [
       { id: 'compteur', label: 'Compteur', unit: 'h', kind: 'number', recordedOn: [0] },
     ],

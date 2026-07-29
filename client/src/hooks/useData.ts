@@ -73,6 +73,7 @@ export interface AppUser {
   name: string
   email: string
   role: 'ADMIN' | 'TECHNICIAN'
+  position: string | null
 }
 
 export async function fetchUsers() {
@@ -83,5 +84,49 @@ export async function setUserRole(userId: string, role: 'ADMIN' | 'TECHNICIAN') 
   return apiFetch<AppUser>(`/api/technicians/${userId}/role`, {
     method: 'PATCH',
     body: JSON.stringify({ role }),
+  })
+}
+
+export async function setUserPosition(userId: string, position: string) {
+  return apiFetch<AppUser>(`/api/technicians/${userId}/position`, {
+    method: 'PATCH',
+    body: JSON.stringify({ position }),
+  })
+}
+
+// --- Periodic maintenance --------------------------------------------------
+
+export type MaintenanceState = 'ok' | 'due_soon' | 'overdue'
+
+export interface MaintenanceStatus {
+  equipmentId: string
+  equipmentName: string
+  intervalHours: number | null
+  intervalDays: number | null
+  warningHoursBefore: number
+  warningDaysBefore: number | null
+  lastServiceMeterReading: number
+  lastServiceDate: string
+  currentMeter: number | null
+  nextDueMeter: number | null
+  hoursRemaining: number | null
+  hourReminderSent: boolean
+  dueDate: string | null
+  daysRemaining: number | null
+  dayReminderSent: boolean
+  hoursPerDay: number | null
+  projectedDueDate: string | null
+  state: MaintenanceState
+  updatedAt: string
+}
+
+export async function fetchMaintenanceAll() {
+  return apiFetch<MaintenanceStatus[]>('/api/equipment/maintenance')
+}
+
+export async function resetMaintenance(equipmentId: string, body: { meterReading?: number; serviceDate?: string } = {}) {
+  return apiFetch<MaintenanceStatus>(`/api/equipment/${equipmentId}/maintenance/reset`, {
+    method: 'POST',
+    body: JSON.stringify(body),
   })
 }

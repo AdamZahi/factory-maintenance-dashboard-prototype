@@ -5,6 +5,7 @@ import { requireUser } from '../middleware/auth'
 import { unauthorizedEquipmentFor } from '../middleware/equipmentAccess'
 import type { CurrentUser } from '../middleware/auth'
 import { notifyOnInspection } from '../services/notifications'
+import { evaluateMaintenanceOnInspection } from '../services/maintenance'
 
 // /api/inspections
 // GET         -> technicians: only their own; admins: all (+ ?technicianId= filter)
@@ -147,6 +148,11 @@ inspectionsRouter.post('/', async (req, res) => {
         await notifyOnInspection(record)
       } catch (err) {
         console.error('[inspections] notifyOnInspection failed', err)
+      }
+      try {
+        await evaluateMaintenanceOnInspection(record)
+      } catch (err) {
+        console.error('[inspections] evaluateMaintenanceOnInspection failed', err)
       }
     }
     res.status(201).json(record)

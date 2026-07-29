@@ -1,6 +1,8 @@
 import { Router } from 'express'
 import { prisma } from '../db'
 import { requireUser, requireAdmin } from '../middleware/auth'
+import { requireEquipmentAccess } from '../middleware/equipmentAccess'
+import { getMaintenanceStatus, resetMaintenance } from '../services/maintenance'
 
 // /api/equipment
 // GET  -> readable by anyone signed in
@@ -12,6 +14,34 @@ equipmentRouter.use(requireUser)
 equipmentRouter.get('/', async (_req, res) => {
   const equipment = await prisma.equipment.findMany({ orderBy: { name: 'asc' } })
   res.json(equipment)
+})
+
+// --- Periodic maintenance ---------------------------------------------------
+
+// All tracked equipment's maintenance status (for the overview). Signed-in users.
+equipmentRouter.get('/maintenance', async (_req, res) => {
+  const schedules = await prisma.maintenanceSchedule.findMany({ select: { equipmentId: true } })
+  const statuses = await Promise.all(schedules.map((s) => getMaintenanceStatus(s.equipmentId)))
+  res.json(statuses.filter(Boolean))
+})
+
+// One equipment's maintenance status. Signed-in users.
+equipmentRouter.get('/:equipmentId/maintenance', async (req, res) => {
+  const status = await getMaintenanceStatus(String(req.params.equipmentId))
+  if (!status) return res.status(404).json({ error: 'No maintenance schedule for this equipment' })
+  res.json(status)
+})
+
+// Reset the service baseline. Admins always; technicians only if assigned.
+equipmentRouter.post('/:equipmentId/maintenance/reset', requireEquipmentAccess, async (req, res) => {
+  const equipmentId = String(req.params.equipmentId)
+  const { meterReading, serviceDate } = req.body ?? {}
+  if (meterReading !== undefined && typeof meterReading !== 'number') {
+    return res.status(400).json({ error: 'meterReading must be a number' })
+  }
+  const status = await resetMaintenance(equipmentId, req.currentUser!.id, { meterReading, serviceDate })
+  if (!status) return res.status(404).json({ error: 'No maintenance schedule for this equipment' })
+  res.json(status)
 })
 
 equipmentRouter.post('/', requireAdmin, async (req, res) => {
