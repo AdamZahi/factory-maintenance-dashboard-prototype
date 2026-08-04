@@ -119,7 +119,7 @@ export function Sidebar({
             {user.imageUrl ? (
               <img src={user.imageUrl} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
             ) : (
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[--color-graphite-900] text-xs font-semibold text-white">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-500 text-xs font-semibold text-white">
                 {initials(user.name)}
               </div>
             )}
