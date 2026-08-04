@@ -71,7 +71,7 @@ export async function notifyOnInspection(inspection: NotifiableInspection): Prom
     if (previous === status) continue // not a transition — throttle repeats (rule 3)
 
     const assignedTechs = await prisma.user.findMany({
-      where: { role: 'TECHNICIAN', assignments: { some: { equipmentId: reading.equipmentId } } },
+      where: { role: 'TECHNICIAN', isActive: true, assignments: { some: { equipmentId: reading.equipmentId } } },
       select: { id: true, email: true, name: true, role: true },
     })
 
@@ -98,7 +98,7 @@ export async function notifyOnInspection(inspection: NotifiableInspection): Prom
     // Email admins on CRITICAL only (warning is in-app only, rule 1).
     if (status === 'critical') {
       const outFields = fields.filter((f) => f.status === 'critical')
-      for (const admin of recipients.filter((r) => r.role === 'ADMIN')) {
+      for (const admin of recipients.filter((r) => r.role === 'ADMIN' || r.role === 'SUPERUSER')) {
         try {
           await sendCriticalAlertEmail({
             to: admin.email,

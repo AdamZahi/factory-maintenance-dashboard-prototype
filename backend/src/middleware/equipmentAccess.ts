@@ -1,16 +1,18 @@
 import type { NextFunction, Request, Response } from 'express'
+import type { Role } from '@prisma/client'
 import { prisma } from '../db'
+import { isAtLeastAdmin } from './auth'
 
 /**
  * Verifies the current user is assigned to every equipment id in `equipmentIds`.
- * Admins bypass the check. Returns the list of equipment ids the user is NOT
- * allowed to touch (empty === allowed).
+ * Admins (and superusers) bypass the check. Returns the list of equipment ids
+ * the user is NOT allowed to touch (empty === allowed).
  */
 export async function unauthorizedEquipmentFor(
-  user: { id: string; role: 'ADMIN' | 'TECHNICIAN' },
+  user: { id: string; role: Role },
   equipmentIds: string[],
 ): Promise<string[]> {
-  if (user.role === 'ADMIN') return []
+  if (isAtLeastAdmin(user.role)) return []
   if (equipmentIds.length === 0) return []
 
   const assignments = await prisma.equipmentAssignment.findMany({
