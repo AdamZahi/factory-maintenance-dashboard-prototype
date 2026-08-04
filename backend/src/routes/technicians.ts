@@ -17,7 +17,7 @@ function serialize(u: { id: string; name: string; email: string; role: Role; pos
 }
 
 techniciansRouter.get('/', async (_req, res) => {
-  const users = await prisma.user.findMany({ orderBy: { name: 'asc' } })
+  const users = await prisma.user.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } })
   res.json(users.map(serialize))
 })
 
@@ -28,6 +28,14 @@ techniciansRouter.patch('/:id/role', async (req, res) => {
   }
 
   const userId = String(req.params.id)
+
+  // Superuser roles are managed exclusively from the User Management screen —
+  // an admin can't demote a superuser via this endpoint.
+  const target = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
+  if (target?.role === 'SUPERUSER') {
+    return res.status(403).json({ error: 'Superuser roles are managed in User Management only' })
+  }
+
   const user = await prisma.user.update({ where: { id: userId }, data: { role } })
 
   // Keep Clerk's publicMetadata.role in sync so the frontend gate stays correct.

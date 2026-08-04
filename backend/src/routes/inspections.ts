@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../db'
-import { requireUser } from '../middleware/auth'
+import { requireUser, isAtLeastAdmin } from '../middleware/auth'
 import { unauthorizedEquipmentFor } from '../middleware/equipmentAccess'
 import type { CurrentUser } from '../middleware/auth'
 import { notifyOnInspection } from '../services/notifications'
@@ -81,7 +81,7 @@ async function upsertInspection(user: CurrentUser, body: IncomingInspection) {
     if (id) {
       const existing = await tx.inspection.findUnique({ where: { id } })
       // Editing an existing inspection is admin-only; technicians may only create new ones.
-      if (existing && user.role !== 'ADMIN') {
+      if (existing && !isAtLeastAdmin(user.role)) {
         throw new AccessError('Only admins can edit an existing inspection')
       }
       // Replace readings wholesale on update.
@@ -186,7 +186,7 @@ inspectionsRouter.post('/batch', async (req, res) => {
 inspectionsRouter.delete('/:id', async (req, res) => {
   const user = req.currentUser!
   // Deleting inspections is admin-only.
-  if (user.role !== 'ADMIN') {
+  if (!isAtLeastAdmin(user.role)) {
     return res.status(403).json({ error: 'Only admins can delete inspections' })
   }
   const inspectionId = String(req.params.id)

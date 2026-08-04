@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { prisma } from '../db'
-import { requireUser, requireAdmin } from '../middleware/auth'
+import { requireUser, requireAdmin, isAtLeastAdmin } from '../middleware/auth'
 
 // /api/assignments
 // GET    -> admins see all (optional ?technicianId= filter); technicians see
@@ -16,7 +16,7 @@ assignmentsRouter.get('/', async (req, res) => {
   const requested = req.query.technicianId as string | undefined
 
   let technicianId: string | undefined
-  if (user.role === 'ADMIN') {
+  if (isAtLeastAdmin(user.role)) {
     technicianId = requested === 'me' ? user.id : requested
   } else {
     // Technicians can only ever read their own assignments.
