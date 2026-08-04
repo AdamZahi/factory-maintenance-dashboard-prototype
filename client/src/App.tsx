@@ -11,17 +11,18 @@ import { SettingsPanel } from './components/SettingsPanel'
 import { NotificationBell } from './components/NotificationBell'
 import { MaintenancePanel } from './components/MaintenancePanel'
 import { MonitoringPage } from './components/MonitoringPage'
+import { UserManagement } from './components/UserManagement'
 import { ToastProvider } from './components/ui/Toast'
 import { ConfirmProvider } from './components/ui/ConfirmDialog'
 import { useInspections } from './hooks/useData'
 import { usePreferences } from './hooks/usePreferences'
 import { setAuthTokenGetter } from './lib/storage'
-import { LayoutDashboard, ClipboardList, History as HistoryIcon, FileSpreadsheet, Users, Wrench, MonitorDot, Search, Menu } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, History as HistoryIcon, FileSpreadsheet, Users, Wrench, MonitorDot, ShieldAlert, Search, Menu } from 'lucide-react'
 
-type Tab = 'dashboard' | 'monitoring' | 'inspection' | 'history' | 'maintenance' | 'excel' | 'assignments'
-type Role = 'admin' | 'technician'
+type Tab = 'dashboard' | 'monitoring' | 'inspection' | 'history' | 'maintenance' | 'excel' | 'assignments' | 'users'
+type Role = 'superuser' | 'admin' | 'technician'
 
-const ALL_TABS: (NavItem & { adminOnly?: boolean })[] = [
+const ALL_TABS: (NavItem & { adminOnly?: boolean; superuserOnly?: boolean })[] = [
   { id: 'dashboard', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" /> },
   { id: 'monitoring', label: 'Supervision', icon: <MonitorDot className="h-4 w-4" /> },
   { id: 'inspection', label: 'Inspection du jour', icon: <ClipboardList className="h-4 w-4" /> },
@@ -29,6 +30,7 @@ const ALL_TABS: (NavItem & { adminOnly?: boolean })[] = [
   { id: 'maintenance', label: 'Entretien', icon: <Wrench className="h-4 w-4" /> },
   { id: 'excel', label: 'Import / Export', icon: <FileSpreadsheet className="h-4 w-4" />, adminOnly: true },
   { id: 'assignments', label: 'Affectations', icon: <Users className="h-4 w-4" />, adminOnly: true },
+  { id: 'users', label: 'Utilisateurs', icon: <ShieldAlert className="h-4 w-4" />, superuserOnly: true },
 ]
 
 const TAB_TITLES: Record<Tab, string> = {
@@ -39,6 +41,7 @@ const TAB_TITLES: Record<Tab, string> = {
   maintenance: 'Entretien périodique',
   excel: 'Import / Export',
   assignments: 'Affectations des équipements',
+  users: 'Gestion des utilisateurs',
 }
 
 /** Bridges Clerk's getToken() into the storage layer so API calls are authenticated. */
@@ -76,8 +79,11 @@ function AuthenticatedApp() {
   const { signOut } = useClerk()
   const { prefs, toggle } = usePreferences()
 
-  const role: Role = (user?.publicMetadata?.role as string | undefined) === 'admin' ? 'admin' : 'technician'
-  const tabs = ALL_TABS.filter((t) => !t.adminOnly || role === 'admin')
+  const rawRole = (user?.publicMetadata?.role as string | undefined)?.toLowerCase()
+  const role: Role = rawRole === 'superuser' ? 'superuser' : rawRole === 'admin' ? 'admin' : 'technician'
+  const isAdmin = role === 'admin' || role === 'superuser' // superuser is a superset of admin
+  const isSuperuser = role === 'superuser'
+  const tabs = ALL_TABS.filter((t) => (t.superuserOnly ? isSuperuser : t.adminOnly ? isAdmin : true))
 
   const [tab, setTab] = useState<Tab>('dashboard')
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null)
@@ -110,7 +116,7 @@ function AuthenticatedApp() {
   }, [])
 
   const displayName = user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? 'Utilisateur'
-  const roleLabel = role === 'admin' ? 'Administrateur' : 'Technicien'
+  const roleLabel = role === 'superuser' ? 'Superutilisateur' : role === 'admin' ? 'Administrateur' : 'Technicien'
   const position = (user?.publicMetadata?.position as string | undefined) ?? ''
   const roleSubtitle = position || roleLabel
   const email = user?.primaryEmailAddress?.emailAddress ?? ''
@@ -183,15 +189,17 @@ function AuthenticatedApp() {
             ) : tab === 'monitoring' ? (
               <MonitoringPage />
             ) : tab === 'inspection' ? (
-              <InspectionForm role={role} />
+              <InspectionForm role={isAdmin ? 'admin' : 'technician'} />
             ) : tab === 'history' ? (
-              <History inspections={inspections} focusInspectionId={historyFocusId} canModify={role === 'admin'} />
+              <History inspections={inspections} focusInspectionId={historyFocusId} canModify={isAdmin} />
             ) : tab === 'maintenance' ? (
               <MaintenancePanel />
-            ) : tab === 'excel' && role === 'admin' ? (
+            ) : tab === 'excel' && isAdmin ? (
               <ImportExport />
-            ) : tab === 'assignments' && role === 'admin' ? (
+            ) : tab === 'assignments' && isAdmin ? (
               <AdminAssignments />
+            ) : tab === 'users' && isSuperuser ? (
+              <UserManagement />
             ) : null}
           </div>
         </main>

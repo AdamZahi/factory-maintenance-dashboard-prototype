@@ -137,22 +137,26 @@ export function AdminAssignments() {
               users.map((u) => (
               <div key={u.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
                 <div className="flex items-center gap-3">
-                  <span className={`flex h-9 w-9 items-center justify-center rounded-full ${u.role === 'ADMIN' ? 'bg-[--color-status-normal-bg] text-[--color-status-normal]' : 'bg-[--color-graphite-50] text-[--color-graphite-500]'}`}>
-                    {u.role === 'ADMIN' ? <ShieldCheck className="h-6 w-6" /> : <User className="h-6 w-6" />}
+                  <span className={`flex h-9 w-9 items-center justify-center rounded-full ${u.role === 'TECHNICIAN' ? 'bg-[--color-graphite-50] text-[--color-graphite-500]' : 'bg-[--color-status-normal-bg] text-[--color-status-normal]'}`}>
+                    {u.role === 'TECHNICIAN' ? <User className="h-6 w-6" /> : <ShieldCheck className="h-6 w-6" />}
                   </span>
                   <div>
                     <p className="text-sm font-medium text-[--color-graphite-900]">{u.name}</p>
                     <p className="text-xs text-[--color-graphite-500]">
-                      {u.email} · {u.role === 'ADMIN' ? 'Administrateur' : 'Technicien'}
+                      {u.email} · {u.role === 'SUPERUSER' ? 'Superutilisateur' : u.role === 'ADMIN' ? 'Administrateur' : 'Technicien'}
                       {u.position ? ` · ${u.position}` : ''}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <PositionEditor user={u} pending={pending.has(`pos:${u.id}`)} onSave={(v) => savePosition(u, v)} />
-                  <Button size="sm" variant="ghost" className="bg-graphite-500 hover:bg-graphite-700 text-white cursor-pointer" disabled={pending.has(`role:${u.id}`)} onClick={() => changeRole(u)}>
-                    {u.role === 'ADMIN' ? 'Rétrograder en technicien' : 'Promouvoir admin'}
-                  </Button>
+                  {u.role === 'SUPERUSER' ? (
+                    <span className="text-xs text-[--color-graphite-400]">Géré dans Utilisateurs</span>
+                  ) : (
+                    <Button size="sm" variant="ghost" className="bg-graphite-500 hover:bg-graphite-700 text-white cursor-pointer" disabled={pending.has(`role:${u.id}`)} onClick={() => changeRole(u)}>
+                      {u.role === 'ADMIN' ? 'Rétrograder en technicien' : 'Promouvoir admin'}
+                    </Button>
+                  )}
                 </div>
               </div>
               ))

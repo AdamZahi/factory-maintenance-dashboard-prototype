@@ -68,11 +68,13 @@ export async function deleteAssignment(technicianId: string, equipmentId: string
 
 // --- Users (admin) ---------------------------------------------------------
 
+export type UserRole = 'SUPERUSER' | 'ADMIN' | 'TECHNICIAN'
+
 export interface AppUser {
   id: string
   name: string
   email: string
-  role: 'ADMIN' | 'TECHNICIAN'
+  role: UserRole
   position: string | null
 }
 
@@ -129,4 +131,48 @@ export async function resetMaintenance(equipmentId: string, body: { meterReading
     method: 'POST',
     body: JSON.stringify(body),
   })
+}
+
+// --- User management (superuser) -------------------------------------------
+
+export interface ManagedUser {
+  id: string
+  name: string
+  email: string
+  role: UserRole
+  position: string | null
+  assignmentCount: number
+  assignments: string[]
+}
+
+export interface Invitation {
+  id: string
+  email: string
+  status: 'pending' | 'accepted'
+  role: string | null
+  createdAt: string
+}
+
+export async function fetchManagedUsers() {
+  return apiFetch<ManagedUser[]>('/api/users')
+}
+
+export async function inviteUser(body: { emailAddress: string; name: string; role: UserRole }) {
+  return apiFetch<Invitation>('/api/users/invite', { method: 'POST', body: JSON.stringify(body) })
+}
+
+export async function updateManagedUser(id: string, body: { role?: UserRole; position?: string }) {
+  return apiFetch<AppUser>(`/api/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
+}
+
+export async function deleteManagedUser(id: string) {
+  return apiFetch<void>(`/api/users/${id}`, { method: 'DELETE' })
+}
+
+export async function fetchInvitations() {
+  return apiFetch<Invitation[]>('/api/invitations')
+}
+
+export async function revokeInvitation(id: string) {
+  return apiFetch<void>(`/api/invitations/${id}`, { method: 'DELETE' })
 }
