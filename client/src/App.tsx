@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { SignedIn, SignedOut, SignIn, useAuth, useUser, useClerk } from '@clerk/clerk-react'
+import { Routes, Route } from 'react-router-dom'
+import { SignedIn, SignedOut, SignIn, SignUp, useAuth, useUser, useClerk } from '@clerk/clerk-react'
 import { InspectionForm } from './components/InspectionForm'
 import { Dashboard } from './components/Dashboard'
 import { History } from './components/History'
@@ -52,24 +53,45 @@ function useAuthTokenBridge() {
   }, [getToken])
 }
 
+function AuthLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-[--color-graphite-50] p-6">
+      <div className="animate-fade-in-up">{children}</div>
+    </div>
+  )
+}
+
 export default function App() {
   return (
-    <>
-      <SignedOut>
-        <div className="flex min-h-screen items-center justify-center bg-[--color-graphite-50] p-6">
-          <div className="animate-fade-in-up">
-            <SignIn />
-          </div>
-        </div>
-      </SignedOut>
-      <SignedIn>
-        <ToastProvider>
-          <ConfirmProvider>
-            <AuthenticatedApp />
-          </ConfirmProvider>
-        </ToastProvider>
-      </SignedIn>
-    </>
+    <Routes>
+      {/* Path-based Clerk pages so `__clerk_ticket` (invitation accept) and other
+          query params are read straight from the real URL. */}
+      <Route
+        path="/sign-up/*"
+        element={<AuthLayout><SignUp routing="path" path="/sign-up" signInUrl="/sign-in" /></AuthLayout>}
+      />
+      <Route
+        path="/sign-in/*"
+        element={<AuthLayout><SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" /></AuthLayout>}
+      />
+      <Route
+        path="/*"
+        element={
+          <>
+            <SignedOut>
+              <AuthLayout><SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" /></AuthLayout>
+            </SignedOut>
+            <SignedIn>
+              <ToastProvider>
+                <ConfirmProvider>
+                  <AuthenticatedApp />
+                </ConfirmProvider>
+              </ToastProvider>
+            </SignedIn>
+          </>
+        }
+      />
+    </Routes>
   )
 }
 
