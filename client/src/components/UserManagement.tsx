@@ -306,7 +306,7 @@ function EditUserModal({
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Annuler</Button>
-          <Button variant="primary" disabled={saving} onClick={save}>
+          <Button variant="primary" className='bg-green-400 cursor-pointer' disabled={saving} onClick={save}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Enregistrer
           </Button>
         </>
