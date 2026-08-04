@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { SignedIn, SignedOut, SignIn, SignUp, useAuth, useUser, useClerk } from '@clerk/clerk-react'
 import { InspectionForm } from './components/InspectionForm'
 import { Dashboard } from './components/Dashboard'
@@ -78,8 +78,10 @@ export default function App() {
         path="/*"
         element={
           <>
+            {/* Path-routed <SignIn> only renders when the URL matches its `path`,
+                so send signed-out users to the dedicated /sign-in route. */}
             <SignedOut>
-              <AuthLayout><SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" /></AuthLayout>
+              <Navigate to="/sign-in" replace />
             </SignedOut>
             <SignedIn>
               <ToastProvider>
