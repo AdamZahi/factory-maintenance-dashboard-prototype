@@ -80,8 +80,9 @@ async function upsertInspection(user: CurrentUser, body: IncomingInspection) {
   const { inspection, created } = await prisma.$transaction(async (tx) => {
     if (id) {
       const existing = await tx.inspection.findUnique({ where: { id } })
-      if (existing && existing.technicianId !== user.id && user.role !== 'ADMIN') {
-        throw new AccessError('Cannot modify an inspection you do not own')
+      // Editing an existing inspection is admin-only; technicians may only create new ones.
+      if (existing && user.role !== 'ADMIN') {
+        throw new AccessError('Only admins can edit an existing inspection')
       }
       // Replace readings wholesale on update.
       await tx.equipmentReading.deleteMany({ where: { inspectionId: id } })
@@ -123,12 +124,11 @@ inspectionsRouter.get('/', async (req, res) => {
   const user = req.currentUser!
   const requested = req.query.technicianId as string | undefined
 
-  let where: Prisma.InspectionWhereInput | undefined
-  if (user.role === 'ADMIN') {
-    where = requested ? { technicianId: requested === 'me' ? user.id : requested } : undefined
-  } else {
-    where = { technicianId: user.id }
-  }
+  // All signed-in users can read the full history; an optional ?technicianId
+  // filter ('me' resolves to the caller) is available to everyone.
+  const where: Prisma.InspectionWhereInput | undefined = requested
+    ? { technicianId: requested === 'me' ? user.id : requested }
+    : undefined
 
   const inspections = await prisma.inspection.findMany({
     where,
@@ -185,12 +185,13 @@ inspectionsRouter.post('/batch', async (req, res) => {
 
 inspectionsRouter.delete('/:id', async (req, res) => {
   const user = req.currentUser!
+  // Deleting inspections is admin-only.
+  if (user.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Only admins can delete inspections' })
+  }
   const inspectionId = String(req.params.id)
   const existing = await prisma.inspection.findUnique({ where: { id: inspectionId } })
   if (!existing) return res.status(204).end()
-  if (existing.technicianId !== user.id && user.role !== 'ADMIN') {
-    return res.status(403).json({ error: 'Cannot delete an inspection you do not own' })
-  }
   await prisma.inspection.delete({ where: { id: inspectionId } })
   res.status(204).end()
 })

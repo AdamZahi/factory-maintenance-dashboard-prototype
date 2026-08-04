@@ -52,11 +52,9 @@ const EMPTY_FILTERS: Filters = { dateFrom: '', dateTo: '', equipmentId: 'all', t
 
 export function Dashboard({
   inspections,
-  role,
   onSelectEquipment,
 }: {
   inspections: InspectionRecord[]
-  role: 'admin' | 'technician'
   onSelectEquipment?: (equipmentId: string) => void
 }) {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
@@ -237,16 +235,14 @@ export function Dashboard({
                 ))}
               </select>
             </Field>
-            {role === 'admin' && (
-              <Field label="Technicien">
-                <select value={filters.technicianId} onChange={(e) => update({ technicianId: e.target.value })} className={inputClass}>
-                  <option value="all">Tous</option>
-                  {technicianOptions.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-              </Field>
-            )}
+            <Field label="Technicien">
+              <select value={filters.technicianId} onChange={(e) => update({ technicianId: e.target.value })} className={inputClass}>
+                <option value="all">Tous</option>
+                {technicianOptions.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </Field>
             <Field label="Statut">
               <select value={filters.status} onChange={(e) => update({ status: e.target.value as Filters['status'] })} className={inputClass}>
                 <option value="all">Tous</option>

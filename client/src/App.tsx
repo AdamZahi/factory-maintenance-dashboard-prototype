@@ -179,13 +179,13 @@ function AuthenticatedApp() {
             {selectedEquipmentId ? (
               <EquipmentParametersDetails equipmentId={selectedEquipmentId} inspections={inspections} onBack={closeEquipmentDetails} />
             ) : tab === 'dashboard' ? (
-              <Dashboard inspections={inspections} role={role} onSelectEquipment={openEquipmentDetails} />
+              <Dashboard inspections={inspections} onSelectEquipment={openEquipmentDetails} />
             ) : tab === 'monitoring' ? (
               <MonitoringPage />
             ) : tab === 'inspection' ? (
               <InspectionForm role={role} />
             ) : tab === 'history' ? (
-              <History inspections={inspections} focusInspectionId={historyFocusId} />
+              <History inspections={inspections} focusInspectionId={historyFocusId} canModify={role === 'admin'} />
             ) : tab === 'maintenance' ? (
               <MaintenancePanel />
             ) : tab === 'excel' && role === 'admin' ? (
