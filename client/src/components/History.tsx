@@ -10,7 +10,7 @@ import { useConfirm } from './ui/ConfirmDialog'
 import type { InspectionRecord, StatusLevel } from '../types'
 import { ChevronDown, ChevronUp, Pencil, Save, X } from 'lucide-react'
 
-export function History({ inspections, focusInspectionId, onFilterChange }: { inspections: InspectionRecord[]; focusInspectionId?: string | null; onFilterChange?: (f: FilterState) => void }) {
+export function History({ inspections, focusInspectionId, canModify = false, onFilterChange }: { inspections: InspectionRecord[]; focusInspectionId?: string | null; canModify?: boolean; onFilterChange?: (f: FilterState) => void }) {
   const [filters, setFilters] = useState<FilterState>({ dateFrom: '', dateTo: '', equipmentId: 'all', status: 'all' })
   const [expanded, setExpanded] = useState<string | null>(null)
 
@@ -181,11 +181,13 @@ export function History({ inspections, focusInspectionId, onFilterChange }: { in
                 {expanded === r.id && (
                   <tr className="border-b border-[--color-graphite-100] bg-[--color-graphite-50]/60">
                     <td colSpan={4} className="px-5 py-4">
-                      <div className="mb-4 flex items-center justify-end">
-                        <Button size="sm" className='bg-red-600' variant="danger" onClick={() => deleteInspection(r)}>
-                          Supprimer la journée
-                        </Button>
-                      </div>
+                      {canModify && (
+                        <div className="mb-4 flex items-center justify-end">
+                          <Button size="sm" className='bg-red-600' variant="danger" onClick={() => deleteInspection(r)}>
+                            Supprimer la journée
+                          </Button>
+                        </div>
+                      )}
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {r.equipmentReadings.filter((eq) => eq.status !== 'unknown').map((eq) => {
                           const def = EQUIPMENT_DEFINITIONS.find((d) => d.id === eq.equipmentId)
@@ -197,9 +199,11 @@ export function History({ inspections, focusInspectionId, onFilterChange }: { in
                                 <span className="text-xs font-semibold uppercase tracking-wide text-[--color-graphite-700]">{def?.name}</span>
                                 <div className="flex items-center gap-2">
                                   <StatusBadge status={eq.status} compact />
-                                  <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); isEditing ? cancelEdit() : startEdit(r, eq.equipmentId) }}>
-                                    {isEditing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-                                  </Button>
+                                  {canModify && (
+                                    <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); isEditing ? cancelEdit() : startEdit(r, eq.equipmentId) }}>
+                                      {isEditing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
 
