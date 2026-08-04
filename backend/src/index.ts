@@ -8,6 +8,8 @@ import { techniciansRouter } from './routes/technicians'
 import { assignmentsRouter } from './routes/assignments'
 import { inspectionsRouter } from './routes/inspections'
 import { notificationsRouter } from './routes/notifications'
+import { usersRouter } from './routes/users'
+import { invitationsRouter } from './routes/invitations'
 import { startMaintenanceCron } from './services/maintenanceCron'
 
 const app = express()
@@ -36,6 +38,8 @@ app.use('/api/technicians', techniciansRouter)
 app.use('/api/assignments', assignmentsRouter)
 app.use('/api/inspections', inspectionsRouter)
 app.use('/api/notifications', notificationsRouter)
+app.use('/api/users', usersRouter)
+app.use('/api/invitations', invitationsRouter)
 
 app.listen(port, () => {
   console.log(`Backend listening on http://localhost:${port}`)

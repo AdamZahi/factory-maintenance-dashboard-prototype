@@ -1,0 +1,2 @@
+-- Add SUPERUSER to the Role enum (ordered above ADMIN).
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'SUPERUSER' BEFORE 'ADMIN';

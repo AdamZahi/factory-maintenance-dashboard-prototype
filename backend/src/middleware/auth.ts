@@ -53,11 +53,17 @@ export async function requireUser(req: Request, res: Response, next: NextFunctio
         clerkUser.primaryEmailAddress?.emailAddress ??
         clerkUser.emailAddresses[0]?.emailAddress ??
         `${userId}@unknown.local`
+      // For invited users, Clerk copies the invitation's publicMetadata.name
+      // onto the account; prefer that, then their profile name.
       const name =
+        (clerkUser.publicMetadata?.name as string | undefined)?.trim() ||
         [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ').trim() ||
         clerkUser.username ||
         email
-      const role = (clerkUser.publicMetadata?.role as Role | undefined) ?? 'TECHNICIAN'
+      // publicMetadata.role is stored lowercase ('superuser'|'admin'|'technician');
+      // normalize to the Prisma enum.
+      const roleRaw = String(clerkUser.publicMetadata?.role ?? '').toUpperCase()
+      const role: Role = roleRaw === 'SUPERUSER' ? 'SUPERUSER' : roleRaw === 'ADMIN' ? 'ADMIN' : 'TECHNICIAN'
       const position = (clerkUser.publicMetadata?.position as string | undefined) ?? null
 
       user = await prisma.user.upsert({
@@ -65,6 +71,12 @@ export async function requireUser(req: Request, res: Response, next: NextFunctio
         update: {},
         create: { id: userId, email, name, role, position },
       })
+    }
+
+    // A soft-deleted user must not keep access even if their Clerk session
+    // hasn't expired yet.
+    if (!user.isActive) {
+      return res.status(401).json({ error: 'Account deactivated' })
     }
 
     req.currentUser = {
@@ -92,4 +104,11 @@ export function requireRole(...roles: Role[]) {
   }
 }
 
-export const requireAdmin = requireRole('ADMIN')
+// Superuser is a strict superset of admin: any admin-gated route also accepts SUPERUSER.
+export const requireAdmin = requireRole('ADMIN', 'SUPERUSER')
+export const requireSuperuser = requireRole('SUPERUSER')
+
+/** True for admin-or-above (ADMIN or SUPERUSER) — use for inline role checks. */
+export function isAtLeastAdmin(role: Role): boolean {
+  return role === 'ADMIN' || role === 'SUPERUSER'
+}
