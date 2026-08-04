@@ -135,7 +135,7 @@ export function UserManagement() {
             </select>
           </div>
           <div className="flex items-end">
-            <Button type="submit" variant="primary" className="w-full" disabled={inviting}>
+            <Button type="submit" variant="primary" className="w-full bg-green-400 cursor-pointer hover:bg-green-600" disabled={inviting}>
               {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               Envoyer l'invitation
             </Button>
