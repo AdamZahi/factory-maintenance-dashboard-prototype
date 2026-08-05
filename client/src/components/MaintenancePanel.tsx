@@ -4,11 +4,11 @@ import { Card, CardHeader, Button } from './ui/Primitives'
 import { Modal } from './ui/Modal'
 import { useToast } from './ui/Toast'
 import { useConfirm } from './ui/ConfirmDialog'
-import { EQUIPMENT_DEFINITIONS } from '../data/equipment'
 import {
   fetchMaintenanceAll, resetMaintenance, createMaintenance, updateMaintenance, deleteMaintenance,
   type MaintenanceStatus, type MaintenanceState, type MaintenanceScheduleInput,
 } from '../hooks/useData'
+import { useEquipmentDefinitions } from '../hooks/useEquipment'
 import { Wrench, RotateCcw, Loader2, CheckCircle2, AlertTriangle, XCircle, CalendarClock, Gauge, Plus, Pencil, Trash2 } from 'lucide-react'
 
 const STATE_META: Record<MaintenanceState, { label: string; cls: string; icon: React.ReactNode; bar: string }> = {
@@ -29,6 +29,7 @@ export function MaintenancePanel({ canManage = false }: { canManage?: boolean })
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [editing, setEditing] = useState<MaintenanceStatus | 'new' | null>(null)
+  const { definitions } = useEquipmentDefinitions()
   const toast = useToast()
   const confirm = useConfirm()
 
@@ -96,7 +97,7 @@ export function MaintenancePanel({ canManage = false }: { canManage?: boolean })
   }
 
   const scheduledIds = new Set(items.map((i) => i.equipmentId))
-  const availableEquipment = EQUIPMENT_DEFINITIONS.filter((d) => !scheduledIds.has(d.id))
+  const availableEquipment = definitions.filter((d) => !scheduledIds.has(d.id))
 
   const summary = {
     overdue: items.filter((i) => i.state === 'overdue').length,

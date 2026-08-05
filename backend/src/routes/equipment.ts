@@ -11,6 +11,7 @@ import {
   MaintenanceError,
   type ScheduleInput,
 } from '../services/maintenance'
+import { listEquipment, upsertEquipment, deleteEquipment, EquipmentError } from '../services/equipment'
 
 // /api/equipment
 // GET  -> readable by anyone signed in
@@ -20,8 +21,7 @@ export const equipmentRouter = Router()
 equipmentRouter.use(requireUser)
 
 equipmentRouter.get('/', async (_req, res) => {
-  const equipment = await prisma.equipment.findMany({ orderBy: { name: 'asc' } })
-  res.json(equipment)
+  res.json(await listEquipment())
 })
 
 // --- Periodic maintenance ---------------------------------------------------
@@ -81,19 +81,19 @@ equipmentRouter.delete('/:equipmentId/maintenance', requireAdmin, async (req, re
   res.status(204).end()
 })
 
+// Create or fully update an equipment + its parameters. Admin / moderator only.
 equipmentRouter.post('/', requireAdmin, async (req, res) => {
-  const { id, name } = req.body ?? {}
-  if (!id || !name) return res.status(400).json({ error: 'id and name are required' })
-
-  const equipment = await prisma.equipment.upsert({
-    where: { id },
-    update: { name },
-    create: { id, name },
-  })
-  res.json(equipment)
+  try {
+    const dto = await upsertEquipment(req.body ?? {})
+    res.json(dto)
+  } catch (err) {
+    if (err instanceof EquipmentError) return res.status(400).json({ error: err.message })
+    console.error('[equipment] upsert failed', err)
+    res.status(500).json({ error: 'Failed to save equipment' })
+  }
 })
 
 equipmentRouter.delete('/:id', requireAdmin, async (req, res) => {
-  await prisma.equipment.delete({ where: { id: String(req.params.id) } }).catch(() => {})
+  await deleteEquipment(String(req.params.id))
   res.status(204).end()
 })

@@ -12,15 +12,16 @@ import { SettingsPanel } from './components/SettingsPanel'
 import { NotificationBell } from './components/NotificationBell'
 import { MaintenancePanel } from './components/MaintenancePanel'
 import { MonitoringPage } from './components/MonitoringPage'
+import { EquipmentManager } from './components/EquipmentManager'
 import { UserManagement } from './components/UserManagement'
 import { ToastProvider } from './components/ui/Toast'
 import { ConfirmProvider } from './components/ui/ConfirmDialog'
 import { useInspections } from './hooks/useData'
 import { usePreferences } from './hooks/usePreferences'
 import { setAuthTokenGetter } from './lib/storage'
-import { LayoutDashboard, ClipboardList, History as HistoryIcon, FileSpreadsheet, Users, Wrench, MonitorDot, ShieldAlert, Search, Menu } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, History as HistoryIcon, FileSpreadsheet, Users, Wrench, MonitorDot, ShieldAlert, Search, Menu, Boxes } from 'lucide-react'
 
-type Tab = 'dashboard' | 'monitoring' | 'inspection' | 'history' | 'maintenance' | 'excel' | 'assignments' | 'users'
+type Tab = 'dashboard' | 'monitoring' | 'inspection' | 'history' | 'maintenance' | 'equipment' | 'excel' | 'assignments' | 'users'
 type Role = 'moderator' | 'admin' | 'technician'
 
 const ALL_TABS: (NavItem & { adminOnly?: boolean; moderatorOnly?: boolean })[] = [
@@ -29,6 +30,7 @@ const ALL_TABS: (NavItem & { adminOnly?: boolean; moderatorOnly?: boolean })[] =
   { id: 'inspection', label: 'Inspection du jour', icon: <ClipboardList className="h-4 w-4" /> },
   { id: 'history', label: 'Historique', icon: <HistoryIcon className="h-4 w-4" /> },
   { id: 'maintenance', label: 'Entretien', icon: <Wrench className="h-4 w-4" /> },
+  { id: 'equipment', label: 'Équipements', icon: <Boxes className="h-4 w-4" />, adminOnly: true },
   { id: 'excel', label: 'Import / Export', icon: <FileSpreadsheet className="h-4 w-4" />, adminOnly: true },
   { id: 'assignments', label: 'Affectations', icon: <Users className="h-4 w-4" />, adminOnly: true },
   { id: 'users', label: 'Utilisateurs', icon: <ShieldAlert className="h-4 w-4" />, moderatorOnly: true },
@@ -40,6 +42,7 @@ const TAB_TITLES: Record<Tab, string> = {
   inspection: 'Inspection du jour',
   history: 'Historique',
   maintenance: 'Entretien périodique',
+  equipment: 'Équipements et paramètres',
   excel: 'Import / Export',
   assignments: 'Affectations des équipements',
   users: 'Gestion des utilisateurs',
@@ -237,6 +240,8 @@ function AuthenticatedApp() {
               <History inspections={inspections} focusInspectionId={historyFocusId} canModify={isAdmin} />
             ) : tab === 'maintenance' ? (
               <MaintenancePanel canManage={isAdmin} />
+            ) : tab === 'equipment' && isAdmin ? (
+              <EquipmentManager canManage={isAdmin} />
             ) : tab === 'excel' && isAdmin ? (
               <ImportExport />
             ) : tab === 'assignments' && isAdmin ? (

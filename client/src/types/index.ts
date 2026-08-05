@@ -4,16 +4,9 @@
 // so the digital model can import/export that exact document.
 // ---------------------------------------------------------------------------
 
-export type EquipmentId =
-  | 'chaudiere'
-  | 'groupe_electrogene'
-  | 'surpresseur_eau'
-  | 'compresseur'
-  | 'local_carburant'
-  | 'chariot_elevateur'
-  | 'consommation_eau'
-  | 'tgbt_1'
-  | 'tgbt_2'
+// Equipment ids are now dynamic (defined in the database, admin-managed), so
+// this is an open string rather than a fixed union.
+export type EquipmentId = string
 
 export type FieldId = string // e.g. "th", "ph", "sulfite", "batterie" ...
 

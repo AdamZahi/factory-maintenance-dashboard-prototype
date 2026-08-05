@@ -3,9 +3,9 @@ import { format, parseISO } from 'date-fns'
 import { useUser } from '@clerk/clerk-react'
 import { Card, CardHeader, Button, Badge } from './ui/Primitives'
 import { StatusBadge } from './ui/StatusBadge'
-import { EQUIPMENT_DEFINITIONS } from '../data/equipment'
 import { evaluateEquipment, worstStatus } from '../lib/validation'
 import { useInspections, useAssignments } from '../hooks/useData'
+import { useEquipmentDefinitions } from '../hooks/useEquipment'
 import { useToast } from './ui/Toast'
 import { generateId } from '../lib/storage'
 import type { StatusLevel } from '../types'
@@ -19,15 +19,16 @@ export function InspectionForm({ role }: { role: 'admin' | 'technician' }) {
   const toast = useToast()
   // Technicians only see equipment they're assigned to; admins see everything.
   const { assignments, loading: assignmentsLoading } = useAssignments(role === 'admin' ? undefined : 'me')
+  const { definitions } = useEquipmentDefinitions()
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [values, setValues] = useState<ValuesState>({})
   const [saved, setSaved] = useState(false)
 
   const visibleDefinitions = useMemo(() => {
-    if (role === 'admin') return EQUIPMENT_DEFINITIONS
+    if (role === 'admin') return definitions
     const assignedIds = new Set(assignments.map((a) => a.equipmentId))
-    return EQUIPMENT_DEFINITIONS.filter((def) => assignedIds.has(def.id))
-  }, [role, assignments])
+    return definitions.filter((def) => assignedIds.has(def.id))
+  }, [role, assignments, definitions])
 
   const readings = useMemo(
     () =>

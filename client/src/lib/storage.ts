@@ -15,6 +15,8 @@ export interface Repository<T extends { id: string }> {
   remove(id: string): void
   clear(): void
   subscribe(listener: () => void): () => void
+  /** Force a re-fetch and notify subscribers (API-backed repos only). */
+  refresh?(): Promise<void>
 }
 
 const LISTENERS = new Map<string, Set<() => void>>()
@@ -152,6 +154,7 @@ export function createApiRepository<T extends { id: string }>(basePath: string):
   return {
     getAll: () => cache,
     getById: (id) => cache.find((i) => i.id === id),
+    refresh,
     save: (item) => {
       upsertLocal(item) // optimistic
       emit()

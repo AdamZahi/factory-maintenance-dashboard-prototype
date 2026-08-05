@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Card, CardHeader, Button } from './ui/Primitives'
-import { EQUIPMENT_DEFINITIONS } from '../data/equipment'
+import { useEquipmentDefinitions } from '../hooks/useEquipment'
 import {
   useAssignments,
   createAssignment,
@@ -20,6 +20,7 @@ export function AdminAssignments() {
   const [users, setUsers] = useState<AppUser[]>([])
   const [usersLoading, setUsersLoading] = useState(true)
   const { assignments, loading: assignmentsLoading, reload: reloadAssignments } = useAssignments()
+  const { definitions } = useEquipmentDefinitions()
   const [pending, setPending] = useState<Set<string>>(new Set())
   const [usersOpen, setUsersOpen] = useState(true)
   const toast = useToast()
@@ -54,7 +55,7 @@ export function AdminAssignments() {
     const key = `${technicianId}:${equipmentId}`
     const wasAssigned = assigned.has(key)
     const tech = technicians.find((t) => t.id === technicianId)
-    const equipmentName = EQUIPMENT_DEFINITIONS.find((d) => d.id === equipmentId)?.name ?? equipmentId
+    const equipmentName = definitions.find((d) => d.id === equipmentId)?.name ?? equipmentId
     markPending(key, true)
     try {
       if (wasAssigned) await deleteAssignment(technicianId, equipmentId)
@@ -182,7 +183,7 @@ export function AdminAssignments() {
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-[--color-graphite-500]">
                   <th className="sticky left-0 bg-white px-3 py-2 font-medium">Technicien</th>
-                  {EQUIPMENT_DEFINITIONS.map((def) => (
+                  {definitions.map((def) => (
                     <th key={def.id} className="px-3 py-2 text-center font-medium">
                       <span className="block max-w-24 text-[11px] leading-tight">{def.name}</span>
                     </th>
@@ -193,7 +194,7 @@ export function AdminAssignments() {
                 {technicians.map((tech) => (
                   <tr key={tech.id} className="border-t border-[--color-graphite-100]">
                     <td className="sticky left-0 bg-white px-3 py-2 font-medium text-[--color-graphite-900]">{tech.name}</td>
-                    {EQUIPMENT_DEFINITIONS.map((def) => {
+                    {definitions.map((def) => {
                       const key = `${tech.id}:${def.id}`
                       const isAssigned = assigned.has(key)
                       const isPending = pending.has(key)

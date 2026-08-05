@@ -2,12 +2,14 @@ import { useRef, useState } from 'react'
 import { format, startOfWeek, startOfMonth } from 'date-fns'
 import { Card, CardHeader, Button, Badge } from './ui/Primitives'
 import { useInspections } from '../hooks/useData'
+import { useEquipmentDefinitions } from '../hooks/useEquipment'
 import { useToast } from './ui/Toast'
 import { downloadWeekExport, downloadIntervalExport, importWorkbook, readWorkbookFromFile } from '../lib/excel'
 import { Upload, Download, FileSpreadsheet, AlertCircle, CheckCircle2, CalendarRange } from 'lucide-react'
 
 export function ImportExport() {
   const { items: inspections, saveMany } = useInspections()
+  const { definitions } = useEquipmentDefinitions()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importSummary, setImportSummary] = useState<{ count: number; warnings: string[] } | null>(null)
   const [exportWeek, setExportWeek] = useState(format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'))
@@ -21,7 +23,7 @@ export function ImportExport() {
     setImportSummary(null)
     try {
       const wb = await readWorkbookFromFile(file)
-      const result = importWorkbook(wb)
+      const result = importWorkbook(wb, definitions)
       if (result.records.length > 0) saveMany(result.records)
       setImportSummary({ count: result.records.length, warnings: result.warnings })
     } catch (err) {
@@ -36,7 +38,7 @@ export function ImportExport() {
       const weekStart = format(startOfWeek(new Date(r.date), { weekStartsOn: 1 }), 'yyyy-MM-dd')
       return weekStart === format(startOfWeek(new Date(exportWeek), { weekStartsOn: 1 }), 'yyyy-MM-dd')
     })
-    downloadWeekExport(weekRecords, { weekStartDate: exportWeek, usine: 'SBM Tunisie' })
+    downloadWeekExport(weekRecords, { weekStartDate: exportWeek, usine: 'SBM Tunisie' }, definitions)
   }
 
   const intervalRecords = inspections.filter((r) => r.date >= exportFrom && r.date <= exportTo)
@@ -46,7 +48,7 @@ export function ImportExport() {
       toast.warning('Intervalle invalide', 'La date de début doit précéder la date de fin.')
       return
     }
-    const weeks = downloadIntervalExport(intervalRecords, { from: exportFrom, to: exportTo, usine: 'SBM Tunisie' })
+    const weeks = downloadIntervalExport(intervalRecords, { from: exportFrom, to: exportTo, usine: 'SBM Tunisie' }, definitions)
     if (weeks === 0) toast.info('Aucune donnée', 'Aucune inspection sur cet intervalle.')
     else toast.success('Export généré', `${intervalRecords.length} inspection(s) sur ${weeks} semaine(s).`)
   }

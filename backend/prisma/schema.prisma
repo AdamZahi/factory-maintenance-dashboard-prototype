@@ -30,11 +30,42 @@ model User {
 model Equipment {
   id              String                @id
   name            String
+  order           Int                   @default(0) // display order (paper-form order for the originals)
+  fields          EquipmentField[]
   assignments     EquipmentAssignment[]
   readings        EquipmentReading[]
   notifications   Notification[]
   schedule        MaintenanceSchedule?
   maintenanceLogs MaintenanceLog[]
+}
+
+// A single measured parameter on an equipment (was hardcoded in the client's
+// EQUIPMENT_DEFINITIONS). `key` is the stable identifier used inside the
+// EquipmentReading.fields JSON, so it must not change once readings exist.
+model EquipmentField {
+  id                 String    @id @default(cuid())
+  equipment          Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  equipmentId        String
+  key                String // reading key, e.g. "th", "ph", "batterie"
+  label              String
+  unit               String?
+  kind               String    @default("number") // "number" | "text"
+  order              Int       @default(0)
+  recordedOn         Int[]     @default([]) // paper-form days (0=Mon..5=Sat); [] = every day
+  helpText           String?
+  // Validation rule — every bound is optional; all-null means "no rule".
+  ruleMin            Float?
+  ruleMax            Float?
+  ruleEquals         Float?
+  ruleThresholdBelow Float?
+  ruleThresholdAbove Float?
+  ruleGreaterThan    Float?
+  ruleLessThan       Float?
+  ruleUnit           String?
+  createdAt          DateTime  @default(now())
+
+  @@unique([equipmentId, key])
+  @@index([equipmentId])
 }
 
 // Periodic servicing schedule per hour-tracked equipment (separate from the

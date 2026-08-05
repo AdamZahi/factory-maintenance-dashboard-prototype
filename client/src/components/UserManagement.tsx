@@ -4,7 +4,7 @@ import { Card, CardHeader, Button } from './ui/Primitives'
 import { Modal } from './ui/Modal'
 import { useToast } from './ui/Toast'
 import { useConfirm } from './ui/ConfirmDialog'
-import { EQUIPMENT_DEFINITIONS } from '../data/equipment'
+import { useEquipmentDefinitions } from '../hooks/useEquipment'
 import { TECHNICIAN_TABS } from '../lib/tabs'
 import {
   fetchManagedUsers, inviteUser, updateManagedUser, deleteManagedUser,
@@ -258,6 +258,7 @@ function EditUserModal({
   const [position, setPosition] = useState(user.position ?? '')
   const [saving, setSaving] = useState(false)
   const { assignments, reload } = useAssignments(user.id)
+  const { definitions } = useEquipmentDefinitions()
   const [pendingEq, setPendingEq] = useState<string | null>(null)
 
   // Visible-tab set for technicians. Empty allowedTabs => all tabs visible.
@@ -353,7 +354,7 @@ function EditUserModal({
         <div>
           <p className="mb-2 text-xs font-medium text-[--color-graphite-500]">Équipements affectés</p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {EQUIPMENT_DEFINITIONS.map((def) => {
+            {definitions.map((def) => {
               const checked = assignedIds.has(def.id)
               return (
                 <label key={def.id} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${checked ? 'border-[--color-brand-300] bg-[--color-brand-50]' : 'border-[--color-graphite-200] hover:bg-[--color-graphite-50]'}`}>

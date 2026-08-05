@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { EQUIPMENT_DEFINITIONS } from '../data/equipment'
 import { statusColor } from '../lib/validation'
 import { StatusDot } from './ui/StatusBadge'
 import { apiFetch } from '../lib/storage'
 import { fetchMaintenanceAll, type MaintenanceStatus } from '../hooks/useData'
-import type { InspectionRecord, StatusLevel } from '../types'
+import { useEquipmentDefinitions } from '../hooks/useEquipment'
+import type { EquipmentDefinition, InspectionRecord, StatusLevel } from '../types'
 import { Maximize2, Minimize2, RefreshCw, Wrench, CircleDot } from 'lucide-react'
 
 const REFRESH_MS = 45_000
 
 export function MonitoringPage() {
   const containerRef = useRef<HTMLDivElement>(null)
+  const { definitions } = useEquipmentDefinitions()
   const [inspections, setInspections] = useState<InspectionRecord[]>([])
   const [maintenance, setMaintenance] = useState<MaintenanceStatus[]>([])
   const [now, setNow] = useState(new Date())
@@ -59,7 +60,7 @@ export function MonitoringPage() {
 
   const tiles = useMemo(
     () =>
-      EQUIPMENT_DEFINITIONS.map((def) => {
+      definitions.map((def) => {
         let reading: InspectionRecord['equipmentReadings'][number] | null = null
         let date: string | null = null
         for (const insp of sorted) {
@@ -72,7 +73,7 @@ export function MonitoringPage() {
         }
         return { def, reading, date, status: (reading?.status ?? 'unknown') as StatusLevel, maint: maintById.get(def.id) ?? null }
       }),
-    [sorted, maintById],
+    [sorted, maintById, definitions],
   )
 
   const counts = useMemo(() => {
@@ -144,7 +145,7 @@ function Count({ label, value, color }: { label: string; value: number; color: s
 }
 
 type Tile = {
-  def: (typeof EQUIPMENT_DEFINITIONS)[number]
+  def: EquipmentDefinition
   reading: InspectionRecord['equipmentReadings'][number] | null
   date: string | null
   status: StatusLevel

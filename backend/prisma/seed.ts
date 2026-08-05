@@ -10,11 +10,35 @@ const MAINTENANCE_SCHEDULES = [
 ]
 
 async function main() {
-  for (const equipment of EQUIPMENT_DEFINITIONS) {
+  for (const [index, equipment] of EQUIPMENT_DEFINITIONS.entries()) {
     await prisma.equipment.upsert({
       where: { id: equipment.id },
-      update: { name: equipment.name },
-      create: { id: equipment.id, name: equipment.name },
+      update: { name: equipment.name, order: index },
+      create: { id: equipment.id, name: equipment.name, order: index },
+    })
+
+    // Replace the field set from the canonical config (readings are keyed by
+    // field key, so recreating rows never affects historical inspections).
+    await prisma.equipmentField.deleteMany({ where: { equipmentId: equipment.id } })
+    await prisma.equipmentField.createMany({
+      data: equipment.fields.map((f, i) => ({
+        equipmentId: equipment.id,
+        key: f.id,
+        label: f.label,
+        unit: f.unit ?? null,
+        kind: f.kind,
+        order: i,
+        recordedOn: f.recordedOn ?? [],
+        helpText: f.helpText ?? null,
+        ruleMin: f.rule?.min ?? null,
+        ruleMax: f.rule?.max ?? null,
+        ruleEquals: f.rule?.equals ?? null,
+        ruleThresholdBelow: f.rule?.thresholdBelow ?? null,
+        ruleThresholdAbove: f.rule?.thresholdAbove ?? null,
+        ruleGreaterThan: f.rule?.greaterThan ?? null,
+        ruleLessThan: f.rule?.lessThan ?? null,
+        ruleUnit: f.rule?.unit ?? null,
+      })),
     })
   }
 

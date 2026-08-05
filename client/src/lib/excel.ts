@@ -1,9 +1,9 @@
 import * as XLSX from 'xlsx'
 import { addDays, format, parseISO, startOfWeek } from 'date-fns'
-import { EQUIPMENT_DEFINITIONS, DAY_LABELS } from '../data/equipment'
+import { DAY_LABELS } from '../data/equipment'
 import { evaluateEquipment, worstStatus } from './validation'
 import { generateId } from './storage'
-import type { EquipmentReading, InspectionRecord, StatusLevel } from '../types'
+import type { EquipmentDefinition, EquipmentReading, InspectionRecord, StatusLevel } from '../types'
 
 // ---------------------------------------------------------------------------
 // This module is the single source of truth for the mapping between the
@@ -68,8 +68,8 @@ const EQUIPMENT_LABEL_ROWS: { equipmentId: string; row: number; name: string }[]
 // Columns C..H = the 6 working days, Mon(0)..Sat(5)
 const DAY_COLUMNS = ['C', 'D', 'E', 'F', 'G', 'H']
 
-function fieldLabel(equipmentId: string, fieldId: string): string {
-  const def = EQUIPMENT_DEFINITIONS.find((e) => e.id === equipmentId)
+function fieldLabel(definitions: EquipmentDefinition[], equipmentId: string, fieldId: string): string {
+  const def = definitions.find((e) => e.id === equipmentId)
   const field = def?.fields.find((f) => f.id === fieldId)
   return field ? `${field.label}${field.unit ? ` (${field.unit})` : ''}` : fieldId
 }
@@ -86,7 +86,7 @@ export interface ExportOptions {
 }
 
 /** Builds a workbook for one week of inspections, laid out exactly like the paper form. */
-export function exportWeekToWorkbook(records: InspectionRecord[], options: ExportOptions): XLSX.WorkBook {
+export function exportWeekToWorkbook(records: InspectionRecord[], options: ExportOptions, definitions: EquipmentDefinition[]): XLSX.WorkBook {
   const weekStart = startOfWeek(parseISO(options.weekStartDate), { weekStartsOn: 1 })
   const weekEnd = addDays(weekStart, 5)
   const recordsByDate = new Map(records.map((r) => [r.date, r]))
@@ -113,7 +113,7 @@ export function exportWeekToWorkbook(records: InspectionRecord[], options: Expor
     setCell(entry.row, 'A', entry.name)
   }
   for (const entry of CELL_MAP) {
-    setCell(entry.row, 'B', fieldLabel(entry.equipmentId, entry.fieldId))
+    setCell(entry.row, 'B', fieldLabel(definitions, entry.equipmentId, entry.fieldId))
 
     let weekStatus: StatusLevel = 'unknown'
     for (let day = 0; day < 6; day++) {
@@ -156,8 +156,8 @@ export function exportWeekToWorkbook(records: InspectionRecord[], options: Expor
   return wb
 }
 
-export function downloadWeekExport(records: InspectionRecord[], options: ExportOptions) {
-  const wb = exportWeekToWorkbook(records, options)
+export function downloadWeekExport(records: InspectionRecord[], options: ExportOptions, definitions: EquipmentDefinition[]) {
+  const wb = exportWeekToWorkbook(records, options, definitions)
   const filename = `Fiche_Controle_${format(parseISO(options.weekStartDate), 'yyyy-MM-dd')}.xlsx`
   XLSX.writeFile(wb, filename)
 }
@@ -169,6 +169,7 @@ export function downloadWeekExport(records: InspectionRecord[], options: ExportO
 export function downloadIntervalExport(
   records: InspectionRecord[],
   options: { from: string; to: string; usine: string },
+  definitions: EquipmentDefinition[],
 ): number {
   const firstWeek = startOfWeek(parseISO(options.from), { weekStartsOn: 1 })
   const lastWeek = startOfWeek(parseISO(options.to), { weekStartsOn: 1 })
@@ -186,7 +187,7 @@ export function downloadIntervalExport(
       return d.getTime() >= weekStart.getTime() && d.getTime() <= weekEnd.getTime()
     })
 
-    const weekWb = exportWeekToWorkbook(weekRecords, { weekStartDate: weekStartStr, usine: options.usine })
+    const weekWb = exportWeekToWorkbook(weekRecords, { weekStartDate: weekStartStr, usine: options.usine }, definitions)
     const sheet = weekWb.Sheets[weekWb.SheetNames[0]]
 
     // Sheet names: unique and ≤ 31 chars (Excel limit).
@@ -218,7 +219,7 @@ export interface ImportResult {
 }
 
 /** Parses an uploaded workbook that follows the same template and reconstructs daily InspectionRecords. */
-export function importWorkbook(workbook: XLSX.WorkBook, technicianName = 'Import Excel'): ImportResult {
+export function importWorkbook(workbook: XLSX.WorkBook, definitions: EquipmentDefinition[], technicianName = 'Import Excel'): ImportResult {
   const warnings: string[] = []
   const sheetName = workbook.SheetNames[0]
   const ws = workbook.Sheets[sheetName]
@@ -258,7 +259,7 @@ export function importWorkbook(workbook: XLSX.WorkBook, technicianName = 'Import
     const equipmentReadings: EquipmentReading[] = []
     let anyValue = false
 
-    for (const def of EQUIPMENT_DEFINITIONS) {
+    for (const def of definitions) {
       const entries = CELL_MAP.filter((e) => e.equipmentId === def.id)
       const values: Record<string, number | string | null> = {}
       for (const entry of entries) {

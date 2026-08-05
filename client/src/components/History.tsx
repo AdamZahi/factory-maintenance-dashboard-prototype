@@ -2,9 +2,9 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { Card, CardHeader, Button } from './ui/Primitives'
 import { StatusBadge } from './ui/StatusBadge'
-import { EQUIPMENT_DEFINITIONS } from '../data/equipment'
 import { evaluateEquipment, worstStatus } from '../lib/validation'
 import { useInspections } from '../hooks/useData'
+import { useEquipmentDefinitions } from '../hooks/useEquipment'
 import { useToast } from './ui/Toast'
 import { useConfirm } from './ui/ConfirmDialog'
 import type { InspectionRecord, StatusLevel } from '../types'
@@ -24,6 +24,7 @@ export function History({ inspections, focusInspectionId, canModify = false, onF
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [draftValues, setDraftValues] = useState<Record<string, string>>({})
   const { save, remove } = useInspections()
+  const { definitions } = useEquipmentDefinitions()
   const toast = useToast()
   const confirm = useConfirm()
 
@@ -48,7 +49,7 @@ export function History({ inspections, focusInspectionId, canModify = false, onF
 
   const startEdit = (record: InspectionRecord, equipmentId: string) => {
     const reading = record.equipmentReadings.find((eq) => eq.equipmentId === equipmentId)
-    const def = EQUIPMENT_DEFINITIONS.find((d) => d.id === equipmentId)
+    const def = definitions.find((d) => d.id === equipmentId)
     if (!reading || !def) return
 
     const nextDraft: Record<string, string> = {}
@@ -86,7 +87,7 @@ export function History({ inspections, focusInspectionId, canModify = false, onF
   }
 
   const saveEdit = (record: InspectionRecord, equipmentId: string) => {
-    const definition = EQUIPMENT_DEFINITIONS.find((d) => d.id === equipmentId)
+    const definition = definitions.find((d) => d.id === equipmentId)
     if (!definition) return
 
     const nextEquipmentReading = evaluateEquipment(
@@ -131,7 +132,7 @@ export function History({ inspections, focusInspectionId, canModify = false, onF
           <label className="mb-1 block text-xs font-medium text-[--color-graphite-500]">Équipement</label>
           <select value={filters.equipmentId} onChange={(e) => update({ equipmentId: e.target.value })} className="w-full rounded-lg border border-[--color-graphite-200] px-2 py-1.5 text-sm">
             <option value="all">Tous</option>
-            {EQUIPMENT_DEFINITIONS.map((d) => (
+            {definitions.map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </select>
@@ -193,7 +194,7 @@ export function History({ inspections, focusInspectionId, canModify = false, onF
                       )}
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {r.equipmentReadings.filter((eq) => eq.status !== 'unknown').map((eq) => {
-                          const def = EQUIPMENT_DEFINITIONS.find((d) => d.id === eq.equipmentId)
+                          const def = definitions.find((d) => d.id === eq.equipmentId)
                           const editKey = `${r.id}:${eq.equipmentId}`
                           const isEditing = editingKey === editKey
                           return (

@@ -18,8 +18,8 @@ import {
 import { ArrowLeft, Activity, PieChart as PieChartIcon, BarChart3 } from 'lucide-react'
 import { Card, CardHeader, Button, Badge } from './ui/Primitives'
 import { StatusBadge } from './ui/StatusBadge'
-import { EQUIPMENT_DEFINITIONS } from '../data/equipment'
 import { statusColor } from '../lib/validation'
+import { useEquipmentDefinitions } from '../hooks/useEquipment'
 import type { InspectionRecord, StatusLevel } from '../types'
 
 const RANGE_COLORS = ['#3A4657', '#2E9E5B', '#E3A008', '#D6423C', '#4E7AE6', '#7A8AA3']
@@ -97,8 +97,9 @@ export function EquipmentParametersDetails({
   onBack: () => void
 }) {
   const [trendRange, setTrendRange] = useState<TrendRange>('week')
+  const { definitions } = useEquipmentDefinitions()
 
-  const definition = EQUIPMENT_DEFINITIONS.find((item) => item.id === equipmentId)
+  const definition = definitions.find((item) => item.id === equipmentId)
 
   const equipmentData = useMemo(() => {
     if (!definition) return null

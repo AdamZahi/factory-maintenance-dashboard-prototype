@@ -6,8 +6,8 @@ import {
 import { format, parseISO, subDays } from 'date-fns'
 import { Card, CardHeader, Button } from './ui/Primitives'
 import { StatusBadge, StatusDot } from './ui/StatusBadge'
-import { EQUIPMENT_DEFINITIONS } from '../data/equipment'
 import { statusColor } from '../lib/validation'
+import { useEquipmentDefinitions } from '../hooks/useEquipment'
 import type { InspectionRecord, StatusLevel } from '../types'
 import { Activity, CheckCircle2, AlertTriangle, XCircle, ArrowRight, Filter, RotateCcw, CalendarDays, Gauge } from 'lucide-react'
 
@@ -57,6 +57,7 @@ export function Dashboard({
   inspections: InspectionRecord[]
   onSelectEquipment?: (equipmentId: string) => void
 }) {
+  const { definitions } = useEquipmentDefinitions()
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   const [trendRange, setTrendRange] = useState<'week' | 'month'>('week')
 
@@ -110,7 +111,7 @@ export function Dashboard({
 
   const distribution = useMemo(() => {
     const counts: Record<string, number> = {}
-    const defs = filters.equipmentId === 'all' ? EQUIPMENT_DEFINITIONS : EQUIPMENT_DEFINITIONS.filter((d) => d.id === filters.equipmentId)
+    const defs = filters.equipmentId === 'all' ? definitions : definitions.filter((d) => d.id === filters.equipmentId)
     for (const def of defs) {
       for (const r of filtered) {
         for (const reading of r.equipmentReadings) {
@@ -123,7 +124,7 @@ export function Dashboard({
       { name: 'Alerte', value: counts.warning ?? 0, color: statusColor('warning') },
       { name: 'Critique', value: counts.critical ?? 0, color: statusColor('critical') },
     ].filter((d) => d.value > 0)
-  }, [filtered, filters.equipmentId])
+  }, [filtered, filters.equipmentId, definitions])
   const totalReadings = distribution.reduce((sum, d) => sum + d.value, 0)
 
   const statusByDay = useMemo(() => {
@@ -140,7 +141,7 @@ export function Dashboard({
 
   // Latest known status per equipment (across the filtered set).
   const equipmentHealth = useMemo(() => {
-    const defs = filters.equipmentId === 'all' ? EQUIPMENT_DEFINITIONS : EQUIPMENT_DEFINITIONS.filter((d) => d.id === filters.equipmentId)
+    const defs = filters.equipmentId === 'all' ? definitions : definitions.filter((d) => d.id === filters.equipmentId)
     return defs.map((def) => {
       let status: StatusLevel = 'unknown'
       let date: string | null = null
@@ -167,7 +168,7 @@ export function Dashboard({
 
   const equipmentTrends = useMemo(() => {
     const cutoff = latestDate ? format(subDays(parseISO(latestDate), trendRange === 'week' ? 6 : 29), 'yyyy-MM-dd') : null
-    const defs = filters.equipmentId === 'all' ? EQUIPMENT_DEFINITIONS : EQUIPMENT_DEFINITIONS.filter((d) => d.id === filters.equipmentId)
+    const defs = filters.equipmentId === 'all' ? definitions : definitions.filter((d) => d.id === filters.equipmentId)
     return defs.map((definition) => {
       const byDate = new Map<string, { date: string; label: string; [k: string]: string | number }>()
       for (const inspection of filtered) {
@@ -186,7 +187,7 @@ export function Dashboard({
       const chartableFields = definition.fields.filter((f) => data.some((p) => typeof p[f.id] === 'number'))
       return { definition, data, chartableFields }
     })
-  }, [filtered, filters.equipmentId, trendRange, latestDate])
+  }, [filtered, filters.equipmentId, trendRange, latestDate, definitions])
 
   const rangeLabel =
     filters.dateFrom || filters.dateTo
@@ -230,7 +231,7 @@ export function Dashboard({
             <Field label="Équipement">
               <select value={filters.equipmentId} onChange={(e) => update({ equipmentId: e.target.value })} className={inputClass}>
                 <option value="all">Tous</option>
-                {EQUIPMENT_DEFINITIONS.map((d) => (
+                {definitions.map((d) => (
                   <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
               </select>
