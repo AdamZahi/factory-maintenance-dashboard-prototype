@@ -171,7 +171,10 @@ export function History({ inspections, focusInspectionId, canModify = false, onF
             {filtered.map((r) => (
               <Fragment key={r.id}>
                 <tr id={`inspection-${r.id}`} className={`cursor-pointer border-b border-[--color-graphite-100] transition-colors hover:bg-[--color-graphite-50] ${focusInspectionId === r.id ? 'bg-[--color-brand-50]' : ''}`} onClick={() => setExpanded(expanded === r.id ? null : r.id)}>
-                  <td className="px-5 py-3 font-mono">{format(parseISO(r.date), 'dd/MM/yyyy')}</td>
+                  <td className="px-5 py-3 font-mono whitespace-nowrap">
+                    {format(parseISO(r.date), 'dd/MM/yyyy')}
+                    {r.createdAt && <span className="text-[--color-graphite-400]"> à {format(parseISO(r.createdAt), 'HH:mm')}</span>}
+                  </td>
                   <td className="px-5 py-3">{r.technicianName}</td>
                   <td className="px-5 py-3"><StatusBadge status={r.overallStatus} compact /></td>
                   <td className="px-5 py-3 text-right text-[--color-graphite-500]">
