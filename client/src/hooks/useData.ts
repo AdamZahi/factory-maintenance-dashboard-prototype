@@ -68,7 +68,7 @@ export async function deleteAssignment(technicianId: string, equipmentId: string
 
 // --- Users (admin) ---------------------------------------------------------
 
-export type UserRole = 'SUPERUSER' | 'ADMIN' | 'TECHNICIAN'
+export type UserRole = 'MODERATOR' | 'ADMIN' | 'TECHNICIAN'
 
 export interface AppUser {
   id: string
@@ -133,7 +133,34 @@ export async function resetMaintenance(equipmentId: string, body: { meterReading
   })
 }
 
-// --- User management (superuser) -------------------------------------------
+export interface MaintenanceScheduleInput {
+  intervalHours?: number | null
+  intervalDays?: number | null
+  warningHoursBefore?: number
+  warningDaysBefore?: number | null
+  lastServiceMeterReading?: number
+  lastServiceDate?: string
+}
+
+export async function createMaintenance(equipmentId: string, body: MaintenanceScheduleInput) {
+  return apiFetch<MaintenanceStatus>(`/api/equipment/${equipmentId}/maintenance`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function updateMaintenance(equipmentId: string, body: MaintenanceScheduleInput) {
+  return apiFetch<MaintenanceStatus>(`/api/equipment/${equipmentId}/maintenance`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function deleteMaintenance(equipmentId: string) {
+  return apiFetch<void>(`/api/equipment/${equipmentId}/maintenance`, { method: 'DELETE' })
+}
+
+// --- User management (moderator) -------------------------------------------
 
 export interface ManagedUser {
   id: string
@@ -141,6 +168,7 @@ export interface ManagedUser {
   email: string
   role: UserRole
   position: string | null
+  allowedTabs: string[]
   assignmentCount: number
   assignments: string[]
 }
@@ -161,7 +189,7 @@ export async function inviteUser(body: { emailAddress: string; name: string; rol
   return apiFetch<Invitation>('/api/users/invite', { method: 'POST', body: JSON.stringify(body) })
 }
 
-export async function updateManagedUser(id: string, body: { role?: UserRole; position?: string }) {
+export async function updateManagedUser(id: string, body: { role?: UserRole; position?: string; allowedTabs?: string[] }) {
   return apiFetch<AppUser>(`/api/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
 }
 

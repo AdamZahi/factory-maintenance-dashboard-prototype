@@ -1,13 +1,13 @@
 import { Router } from 'express'
 import { clerkClient } from '@clerk/express'
-import { requireUser, requireSuperuser } from '../middleware/auth'
+import { requireUser, requireModerator } from '../middleware/auth'
 
-// /api/invitations  (SUPERUSER-exclusive)
+// /api/invitations  (MODERATOR-exclusive)
 // GET       -> proxy Clerk's invitation list (pending + accepted only)
 // DELETE /:id -> revoke a pending invitation
 export const invitationsRouter = Router()
 
-invitationsRouter.use(requireUser, requireSuperuser)
+invitationsRouter.use(requireUser, requireModerator)
 
 invitationsRouter.get('/', async (_req, res) => {
   try {

@@ -98,7 +98,7 @@ export async function notifyOnInspection(inspection: NotifiableInspection): Prom
     // Email admins on CRITICAL only (warning is in-app only, rule 1).
     if (status === 'critical') {
       const outFields = fields.filter((f) => f.status === 'critical')
-      for (const admin of recipients.filter((r) => r.role === 'ADMIN' || r.role === 'SUPERUSER')) {
+      for (const admin of recipients.filter((r) => r.role === 'ADMIN' || r.role === 'MODERATOR')) {
         try {
           await sendCriticalAlertEmail({
             to: admin.email,

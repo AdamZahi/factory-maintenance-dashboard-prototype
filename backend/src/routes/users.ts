@@ -2,21 +2,23 @@ import { Router } from 'express'
 import { clerkClient } from '@clerk/express'
 import type { Role } from '@prisma/client'
 import { prisma } from '../db'
-import { requireUser, requireSuperuser } from '../middleware/auth'
+import { requireUser, requireModerator } from '../middleware/auth'
 
-// /api/users  (SUPERUSER-exclusive) — user management
+// /api/users  (MODERATOR-exclusive) — user management
 // POST /invite  -> create a Clerk invitation with role/name metadata
 // GET  /        -> active users with role, position, assignment count/list
 // PATCH /:id    -> { role?, position? } — kept in sync with Clerk metadata
 // DELETE /:id   -> soft delete + Clerk delete + assignment strip (transactional)
 export const usersRouter = Router()
 
-usersRouter.use(requireUser, requireSuperuser)
+usersRouter.use(requireUser, requireModerator)
 
-const VALID_ROLES: Role[] = ['SUPERUSER', 'ADMIN', 'TECHNICIAN']
+const VALID_ROLES: Role[] = ['MODERATOR', 'ADMIN', 'TECHNICIAN']
+// Tabs a technician's access can be restricted to (mirror of client/src/lib/tabs.ts).
+const TECHNICIAN_TAB_IDS = ['dashboard', 'monitoring', 'inspection', 'history', 'maintenance']
 
-function serialize(u: { id: string; name: string; email: string; role: Role; position: string | null }) {
-  return { id: u.id, name: u.name, email: u.email, role: u.role, position: u.position }
+function serialize(u: { id: string; name: string; email: string; role: Role; position: string | null; allowedTabs: string[] }) {
+  return { id: u.id, name: u.name, email: u.email, role: u.role, position: u.position, allowedTabs: u.allowedTabs }
 }
 
 usersRouter.post('/invite', async (req, res) => {
@@ -70,7 +72,7 @@ usersRouter.get('/', async (_req, res) => {
 usersRouter.patch('/:id', async (req, res) => {
   const id = String(req.params.id)
 
-  const data: { role?: Role; position?: string | null } = {}
+  const data: { role?: Role; position?: string | null; allowedTabs?: string[] } = {}
   const clerkMeta: Record<string, unknown> = {}
 
   if (req.body?.role !== undefined) {
@@ -83,6 +85,13 @@ usersRouter.patch('/:id', async (req, res) => {
     const raw = typeof req.body.position === 'string' ? req.body.position.trim() : ''
     data.position = raw.length > 0 ? raw : null
     clerkMeta.position = data.position
+  }
+  if (req.body?.allowedTabs !== undefined) {
+    if (!Array.isArray(req.body.allowedTabs)) return res.status(400).json({ error: 'allowedTabs must be an array' })
+    // Keep only known, unique tab ids.
+    const tabs = [...new Set((req.body.allowedTabs as unknown[]).filter((t): t is string => typeof t === 'string' && TECHNICIAN_TAB_IDS.includes(t)))]
+    data.allowedTabs = tabs
+    clerkMeta.allowedTabs = tabs // mirror so the technician's client can read their own gating
   }
   if (Object.keys(data).length === 0) return res.status(400).json({ error: 'Nothing to update' })
 

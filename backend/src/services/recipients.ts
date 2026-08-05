@@ -8,12 +8,12 @@ export interface Recipient {
 }
 
 /**
- * Active admin-level recipients (ADMIN + SUPERUSER) — the shared recipient list
+ * Active admin-level recipients (ADMIN + MODERATOR) — the shared recipient list
  * for status alerts and maintenance reminders. Soft-deleted users are excluded.
  */
 export function getAdminUsers(): Promise<Recipient[]> {
   return prisma.user.findMany({
-    where: { role: { in: ['ADMIN', 'SUPERUSER'] }, isActive: true },
+    where: { role: { in: ['ADMIN', 'MODERATOR'] }, isActive: true },
     select: { id: true, email: true, name: true, role: true },
   })
 }

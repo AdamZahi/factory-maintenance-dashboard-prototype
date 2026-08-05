@@ -143,14 +143,14 @@ export function AdminAssignments() {
                   <div>
                     <p className="text-sm font-medium text-[--color-graphite-900]">{u.name}</p>
                     <p className="text-xs text-[--color-graphite-500]">
-                      {u.email} · {u.role === 'SUPERUSER' ? 'Superutilisateur' : u.role === 'ADMIN' ? 'Administrateur' : 'Technicien'}
+                      {u.email} · {u.role === 'MODERATOR' ? 'Modérateur' : u.role === 'ADMIN' ? 'Administrateur' : 'Technicien'}
                       {u.position ? ` · ${u.position}` : ''}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <PositionEditor user={u} pending={pending.has(`pos:${u.id}`)} onSave={(v) => savePosition(u, v)} />
-                  {u.role === 'SUPERUSER' ? (
+                  {u.role === 'MODERATOR' ? (
                     <span className="text-xs text-[--color-graphite-400]">Géré dans Utilisateurs</span>
                   ) : (
                     <Button size="sm" variant="ghost" className="bg-graphite-500 hover:bg-graphite-700 text-white cursor-pointer" disabled={pending.has(`role:${u.id}`)} onClick={() => changeRole(u)}>

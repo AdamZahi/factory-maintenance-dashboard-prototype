@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { SignedIn, SignedOut, SignIn, SignUp, useAuth, useUser, useClerk } from '@clerk/clerk-react'
 import { InspectionForm } from './components/InspectionForm'
@@ -21,9 +21,9 @@ import { setAuthTokenGetter } from './lib/storage'
 import { LayoutDashboard, ClipboardList, History as HistoryIcon, FileSpreadsheet, Users, Wrench, MonitorDot, ShieldAlert, Search, Menu } from 'lucide-react'
 
 type Tab = 'dashboard' | 'monitoring' | 'inspection' | 'history' | 'maintenance' | 'excel' | 'assignments' | 'users'
-type Role = 'superuser' | 'admin' | 'technician'
+type Role = 'moderator' | 'admin' | 'technician'
 
-const ALL_TABS: (NavItem & { adminOnly?: boolean; superuserOnly?: boolean })[] = [
+const ALL_TABS: (NavItem & { adminOnly?: boolean; moderatorOnly?: boolean })[] = [
   { id: 'dashboard', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" /> },
   { id: 'monitoring', label: 'Supervision', icon: <MonitorDot className="h-4 w-4" /> },
   { id: 'inspection', label: 'Inspection du jour', icon: <ClipboardList className="h-4 w-4" /> },
@@ -31,7 +31,7 @@ const ALL_TABS: (NavItem & { adminOnly?: boolean; superuserOnly?: boolean })[] =
   { id: 'maintenance', label: 'Entretien', icon: <Wrench className="h-4 w-4" /> },
   { id: 'excel', label: 'Import / Export', icon: <FileSpreadsheet className="h-4 w-4" />, adminOnly: true },
   { id: 'assignments', label: 'Affectations', icon: <Users className="h-4 w-4" />, adminOnly: true },
-  { id: 'users', label: 'Utilisateurs', icon: <ShieldAlert className="h-4 w-4" />, superuserOnly: true },
+  { id: 'users', label: 'Utilisateurs', icon: <ShieldAlert className="h-4 w-4" />, moderatorOnly: true },
 ]
 
 const TAB_TITLES: Record<Tab, string> = {
@@ -104,10 +104,22 @@ function AuthenticatedApp() {
   const { prefs, toggle } = usePreferences()
 
   const rawRole = (user?.publicMetadata?.role as string | undefined)?.toLowerCase()
-  const role: Role = rawRole === 'superuser' ? 'superuser' : rawRole === 'admin' ? 'admin' : 'technician'
-  const isAdmin = role === 'admin' || role === 'superuser' // superuser is a superset of admin
-  const isSuperuser = role === 'superuser'
-  const tabs = ALL_TABS.filter((t) => (t.superuserOnly ? isSuperuser : t.adminOnly ? isAdmin : true))
+  // 'superuser' is accepted as a legacy alias for accounts provisioned before the rename.
+  const role: Role = rawRole === 'moderator' || rawRole === 'superuser' ? 'moderator' : rawRole === 'admin' ? 'admin' : 'technician'
+  const isAdmin = role === 'admin' || role === 'moderator' // moderator is a superset of admin
+  const isModerator = role === 'moderator'
+
+  // Technician tab allowlist (set by a moderator). Empty = all default tabs.
+  const allowedTabsStr = (Array.isArray(user?.publicMetadata?.allowedTabs) ? (user!.publicMetadata!.allowedTabs as string[]) : []).join(',')
+  const tabs = useMemo(() => {
+    const allowed = allowedTabsStr ? allowedTabsStr.split(',') : []
+    return ALL_TABS.filter((t) => {
+      if (t.moderatorOnly) return isModerator
+      if (t.adminOnly) return isAdmin
+      if (isAdmin) return true // admins/moderators see every base tab
+      return allowed.length === 0 || allowed.includes(t.id) // technician: restricted set
+    })
+  }, [allowedTabsStr, isAdmin, isModerator])
 
   const [tab, setTab] = useState<Tab>('dashboard')
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null)
@@ -115,6 +127,13 @@ function AuthenticatedApp() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [historyFocusId, setHistoryFocusId] = useState<string | null>(null)
   const { items: inspections } = useInspections()
+
+  // If the active tab isn't visible (e.g. a technician's tab access was changed), fall back.
+  useEffect(() => {
+    if (!selectedEquipmentId && !tabs.some((t) => t.id === tab)) {
+      setTab((tabs[0]?.id as Tab) ?? 'dashboard')
+    }
+  }, [tabs, tab, selectedEquipmentId])
 
   // Open a specific inspection in History (from a notification or an email deep-link).
   const focusInspection = (inspectionId: string) => {
@@ -140,7 +159,7 @@ function AuthenticatedApp() {
   }, [])
 
   const displayName = user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? 'Utilisateur'
-  const roleLabel = role === 'superuser' ? 'Superutilisateur' : role === 'admin' ? 'Administrateur' : 'Technicien'
+  const roleLabel = role === 'moderator' ? 'Modérateur' : role === 'admin' ? 'Administrateur' : 'Technicien'
   const position = (user?.publicMetadata?.position as string | undefined) ?? ''
   const roleSubtitle = position || roleLabel
   const email = user?.primaryEmailAddress?.emailAddress ?? ''
@@ -217,12 +236,12 @@ function AuthenticatedApp() {
             ) : tab === 'history' ? (
               <History inspections={inspections} focusInspectionId={historyFocusId} canModify={isAdmin} />
             ) : tab === 'maintenance' ? (
-              <MaintenancePanel />
+              <MaintenancePanel canManage={isAdmin} />
             ) : tab === 'excel' && isAdmin ? (
               <ImportExport />
             ) : tab === 'assignments' && isAdmin ? (
               <AdminAssignments />
-            ) : tab === 'users' && isSuperuser ? (
+            ) : tab === 'users' && isModerator ? (
               <UserManagement />
             ) : null}
           </div>

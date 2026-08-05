@@ -245,6 +245,86 @@ export async function resetMaintenance(
   return getMaintenanceStatus(equipmentId)
 }
 
+// ---------------------------------------------------------------------------
+// CRUD (admin / moderator)
+// ---------------------------------------------------------------------------
+
+export interface ScheduleInput {
+  intervalHours?: number | null
+  intervalDays?: number | null
+  warningHoursBefore?: number
+  warningDaysBefore?: number | null
+  lastServiceMeterReading?: number
+  lastServiceDate?: string
+}
+
+export class MaintenanceError extends Error {}
+
+function normalizeInput(input: ScheduleInput) {
+  const intervalHours = input.intervalHours != null ? Math.max(0, Math.round(input.intervalHours)) || null : null
+  const intervalDays = input.intervalDays != null ? Math.max(0, Math.round(input.intervalDays)) || null : null
+  if (!intervalHours && !intervalDays) {
+    throw new MaintenanceError('Au moins un intervalle (heures ou jours) est requis.')
+  }
+  return {
+    intervalHours,
+    intervalDays,
+    warningHoursBefore: Math.max(0, Math.round(input.warningHoursBefore ?? 0)),
+    warningDaysBefore: input.warningDaysBefore != null ? Math.max(0, Math.round(input.warningDaysBefore)) : null,
+  }
+}
+
+/** Create a servicing schedule for an equipment (must exist, must not already have one). */
+export async function createSchedule(equipmentId: string, input: ScheduleInput): Promise<MaintenanceStatusDTO | null> {
+  const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId } })
+  if (!equipment) throw new MaintenanceError('Équipement introuvable.')
+  const existing = await prisma.maintenanceSchedule.findUnique({ where: { equipmentId } })
+  if (existing) throw new MaintenanceError('Cet équipement a déjà une échéance d’entretien.')
+
+  const norm = normalizeInput(input)
+  await prisma.maintenanceSchedule.create({
+    data: {
+      equipmentId,
+      ...norm,
+      lastServiceMeterReading: input.lastServiceMeterReading ?? 0,
+      lastServiceDate: input.lastServiceDate ? new Date(input.lastServiceDate) : new Date(),
+    },
+  })
+  return getMaintenanceStatus(equipmentId)
+}
+
+/** Edit an existing servicing schedule's intervals / warning windows / baseline. */
+export async function updateSchedule(equipmentId: string, input: ScheduleInput): Promise<MaintenanceStatusDTO | null> {
+  const existing = await prisma.maintenanceSchedule.findUnique({ where: { equipmentId } })
+  if (!existing) throw new MaintenanceError('Aucune échéance pour cet équipement.')
+
+  // Merge with existing so a partial update still satisfies the "at least one interval" rule.
+  const norm = normalizeInput({
+    intervalHours: input.intervalHours !== undefined ? input.intervalHours : existing.intervalHours,
+    intervalDays: input.intervalDays !== undefined ? input.intervalDays : existing.intervalDays,
+    warningHoursBefore: input.warningHoursBefore !== undefined ? input.warningHoursBefore : existing.warningHoursBefore,
+    warningDaysBefore: input.warningDaysBefore !== undefined ? input.warningDaysBefore : existing.warningDaysBefore,
+  })
+
+  await prisma.maintenanceSchedule.update({
+    where: { equipmentId },
+    data: {
+      ...norm,
+      ...(input.lastServiceMeterReading !== undefined ? { lastServiceMeterReading: input.lastServiceMeterReading } : {}),
+      ...(input.lastServiceDate !== undefined ? { lastServiceDate: new Date(input.lastServiceDate) } : {}),
+    },
+  })
+  return getMaintenanceStatus(equipmentId)
+}
+
+/** Delete a servicing schedule (its MaintenanceLog history is retained). */
+export async function deleteSchedule(equipmentId: string): Promise<boolean> {
+  const existing = await prisma.maintenanceSchedule.findUnique({ where: { equipmentId } })
+  if (!existing) return false
+  await prisma.maintenanceSchedule.delete({ where: { equipmentId } })
+  return true
+}
+
 async function emailAdmins(
   schedule: MaintenanceSchedule,
   kind: 'hour' | 'day',

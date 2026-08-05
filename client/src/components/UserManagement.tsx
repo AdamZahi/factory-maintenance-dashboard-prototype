@@ -5,6 +5,7 @@ import { Modal } from './ui/Modal'
 import { useToast } from './ui/Toast'
 import { useConfirm } from './ui/ConfirmDialog'
 import { EQUIPMENT_DEFINITIONS } from '../data/equipment'
+import { TECHNICIAN_TABS } from '../lib/tabs'
 import {
   fetchManagedUsers, inviteUser, updateManagedUser, deleteManagedUser,
   fetchInvitations, revokeInvitation, useAssignments, createAssignment, deleteAssignment,
@@ -15,11 +16,11 @@ import { UserPlus, Loader2, Pencil, Trash2, Mail, ShieldCheck, ShieldAlert, User
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: 'TECHNICIAN', label: 'Technicien' },
   { value: 'ADMIN', label: 'Administrateur' },
-  { value: 'SUPERUSER', label: 'Superutilisateur' },
+  { value: 'MODERATOR', label: 'Modérateur' },
 ]
 
 const ROLE_META: Record<UserRole, { label: string; cls: string; icon: React.ReactNode }> = {
-  SUPERUSER: { label: 'Superutilisateur', cls: 'bg-[--color-brand-50] text-[--color-brand-700]', icon: <ShieldAlert className="h-3.5 w-3.5" /> },
+  MODERATOR: { label: 'Modérateur', cls: 'bg-[--color-brand-50] text-[--color-brand-700]', icon: <ShieldAlert className="h-3.5 w-3.5" /> },
   ADMIN: { label: 'Administrateur', cls: 'bg-[--color-status-normal-bg] text-[--color-status-normal]', icon: <ShieldCheck className="h-3.5 w-3.5" /> },
   TECHNICIAN: { label: 'Technicien', cls: 'bg-[--color-graphite-100] text-[--color-graphite-600]', icon: <User className="h-3.5 w-3.5" /> },
 }
@@ -249,7 +250,7 @@ function EditUserModal({
 }: {
   user: ManagedUser
   onClose: () => void
-  onSaved: (u: { id: string; role: UserRole; position: string | null }) => void
+  onSaved: (u: { id: string; role: UserRole; position: string | null; allowedTabs: string[] }) => void
   onAssignmentsChanged: (count: number) => void
 }) {
   const toast = useToast()
@@ -258,6 +259,18 @@ function EditUserModal({
   const [saving, setSaving] = useState(false)
   const { assignments, reload } = useAssignments(user.id)
   const [pendingEq, setPendingEq] = useState<string | null>(null)
+
+  // Visible-tab set for technicians. Empty allowedTabs => all tabs visible.
+  const [visibleTabs, setVisibleTabs] = useState<Set<string>>(
+    () => new Set(user.allowedTabs.length ? user.allowedTabs : TECHNICIAN_TABS.map((t) => t.id)),
+  )
+  const toggleTab = (id: string) =>
+    setVisibleTabs((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
 
   const assignedIds = new Set(assignments.map((a) => a.equipmentId))
 
@@ -283,10 +296,21 @@ function EditUserModal({
 
   const save = async () => {
     setSaving(true)
+    // For technicians, persist the tab allowlist ([] when all are checked = unrestricted).
+    const allowedTabs =
+      role === 'TECHNICIAN'
+        ? visibleTabs.size >= TECHNICIAN_TABS.length
+          ? []
+          : Array.from(visibleTabs)
+        : user.allowedTabs
     try {
-      await updateManagedUser(user.id, { role, position: position.trim() })
+      await updateManagedUser(user.id, {
+        role,
+        position: position.trim(),
+        ...(role === 'TECHNICIAN' ? { allowedTabs } : {}),
+      })
       toast.success('Utilisateur mis à jour', user.name)
-      onSaved({ id: user.id, role, position: position.trim() || null })
+      onSaved({ id: user.id, role, position: position.trim() || null, allowedTabs })
     } catch (err) {
       console.error('[users] update failed', err)
       toast.error('Mise à jour impossible', 'Le rôle et les métadonnées sont restés cohérents.')
@@ -348,6 +372,24 @@ function EditUserModal({
           </div>
           <p className="mt-2 text-[11px] text-[--color-graphite-400]">Les affectations sont enregistrées immédiatement.</p>
         </div>
+
+        {role === 'TECHNICIAN' && (
+          <div>
+            <p className="mb-2 text-xs font-medium text-[--color-graphite-500]">Onglets accessibles</p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {TECHNICIAN_TABS.map((t) => {
+                const checked = visibleTabs.has(t.id)
+                return (
+                  <label key={t.id} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${checked ? 'border-[--color-brand-300] bg-[--color-brand-50]' : 'border-[--color-graphite-200] hover:bg-[--color-graphite-50]'}`}>
+                    <input type="checkbox" checked={checked} onChange={() => toggleTab(t.id)} className="h-4 w-4 cursor-pointer accent-[--color-brand-600]" />
+                    <span className="text-[--color-graphite-800]">{t.label}</span>
+                  </label>
+                )
+              })}
+            </div>
+            <p className="mt-2 text-[11px] text-[--color-graphite-400]">Décochez pour masquer un onglet à ce technicien. Enregistré avec le bouton ci-dessous.</p>
+          </div>
+        )}
       </div>
     </Modal>
   )
