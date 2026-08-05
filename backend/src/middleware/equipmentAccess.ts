@@ -5,7 +5,7 @@ import { isAtLeastAdmin } from './auth'
 
 /**
  * Verifies the current user is assigned to every equipment id in `equipmentIds`.
- * Admins (and superusers) bypass the check. Returns the list of equipment ids
+ * Admins (and moderators) bypass the check. Returns the list of equipment ids
  * the user is NOT allowed to touch (empty === allowed).
  */
 export async function unauthorizedEquipmentFor(

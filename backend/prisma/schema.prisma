@@ -7,7 +7,7 @@ datasource db {
 }
 
 enum Role {
-  SUPERUSER
+  MODERATOR
   ADMIN
   TECHNICIAN
 }
@@ -19,6 +19,7 @@ model User {
   position        String? // job title, e.g. "Coordinateur", "Responsable maintenance"
   role            Role                  @default(TECHNICIAN)
   isActive        Boolean               @default(true) // soft-delete flag
+  allowedTabs     String[]              @default([]) // technician tab allowlist; [] = all default tabs
   createdAt       DateTime              @default(now())
   assignments     EquipmentAssignment[]
   inspections     Inspection[]

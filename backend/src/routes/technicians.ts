@@ -29,11 +29,11 @@ techniciansRouter.patch('/:id/role', async (req, res) => {
 
   const userId = String(req.params.id)
 
-  // Superuser roles are managed exclusively from the User Management screen —
-  // an admin can't demote a superuser via this endpoint.
+  // Moderator roles are managed exclusively from the User Management screen —
+  // an admin can't demote a moderator via this endpoint.
   const target = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
-  if (target?.role === 'SUPERUSER') {
-    return res.status(403).json({ error: 'Superuser roles are managed in User Management only' })
+  if (target?.role === 'MODERATOR') {
+    return res.status(403).json({ error: 'Moderator roles are managed in User Management only' })
   }
 
   const user = await prisma.user.update({ where: { id: userId }, data: { role } })

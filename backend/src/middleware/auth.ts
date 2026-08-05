@@ -60,10 +60,11 @@ export async function requireUser(req: Request, res: Response, next: NextFunctio
         [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ').trim() ||
         clerkUser.username ||
         email
-      // publicMetadata.role is stored lowercase ('superuser'|'admin'|'technician');
-      // normalize to the Prisma enum.
+      // publicMetadata.role is stored lowercase ('moderator'|'admin'|'technician');
+      // normalize to the Prisma enum. 'superuser' is accepted as a legacy alias.
       const roleRaw = String(clerkUser.publicMetadata?.role ?? '').toUpperCase()
-      const role: Role = roleRaw === 'SUPERUSER' ? 'SUPERUSER' : roleRaw === 'ADMIN' ? 'ADMIN' : 'TECHNICIAN'
+      const role: Role =
+        roleRaw === 'MODERATOR' || roleRaw === 'SUPERUSER' ? 'MODERATOR' : roleRaw === 'ADMIN' ? 'ADMIN' : 'TECHNICIAN'
       const position = (clerkUser.publicMetadata?.position as string | undefined) ?? null
 
       user = await prisma.user.upsert({
@@ -104,11 +105,11 @@ export function requireRole(...roles: Role[]) {
   }
 }
 
-// Superuser is a strict superset of admin: any admin-gated route also accepts SUPERUSER.
-export const requireAdmin = requireRole('ADMIN', 'SUPERUSER')
-export const requireSuperuser = requireRole('SUPERUSER')
+// Moderator is a strict superset of admin: any admin-gated route also accepts MODERATOR.
+export const requireAdmin = requireRole('ADMIN', 'MODERATOR')
+export const requireModerator = requireRole('MODERATOR')
 
-/** True for admin-or-above (ADMIN or SUPERUSER) — use for inline role checks. */
+/** True for admin-or-above (ADMIN or MODERATOR) — use for inline role checks. */
 export function isAtLeastAdmin(role: Role): boolean {
-  return role === 'ADMIN' || role === 'SUPERUSER'
+  return role === 'ADMIN' || role === 'MODERATOR'
 }
