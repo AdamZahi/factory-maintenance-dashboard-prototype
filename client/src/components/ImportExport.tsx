@@ -1,16 +1,20 @@
 import { useRef, useState } from 'react'
-import { format, startOfWeek } from 'date-fns'
+import { format, startOfWeek, startOfMonth } from 'date-fns'
 import { Card, CardHeader, Button, Badge } from './ui/Primitives'
 import { useInspections } from '../hooks/useData'
-import { downloadWeekExport, importWorkbook, readWorkbookFromFile } from '../lib/excel'
-import { Upload, Download, FileSpreadsheet, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { useToast } from './ui/Toast'
+import { downloadWeekExport, downloadIntervalExport, importWorkbook, readWorkbookFromFile } from '../lib/excel'
+import { Upload, Download, FileSpreadsheet, AlertCircle, CheckCircle2, CalendarRange } from 'lucide-react'
 
 export function ImportExport() {
   const { items: inspections, saveMany } = useInspections()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importSummary, setImportSummary] = useState<{ count: number; warnings: string[] } | null>(null)
   const [exportWeek, setExportWeek] = useState(format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'))
+  const [exportFrom, setExportFrom] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
+  const [exportTo, setExportTo] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [busy, setBusy] = useState(false)
+  const toast = useToast()
 
   const handleFile = async (file: File) => {
     setBusy(true)
@@ -33,6 +37,18 @@ export function ImportExport() {
       return weekStart === format(startOfWeek(new Date(exportWeek), { weekStartsOn: 1 }), 'yyyy-MM-dd')
     })
     downloadWeekExport(weekRecords, { weekStartDate: exportWeek, usine: 'SBM Tunisie' })
+  }
+
+  const intervalRecords = inspections.filter((r) => r.date >= exportFrom && r.date <= exportTo)
+
+  const handleIntervalExport = () => {
+    if (exportFrom > exportTo) {
+      toast.warning('Intervalle invalide', 'La date de début doit précéder la date de fin.')
+      return
+    }
+    const weeks = downloadIntervalExport(intervalRecords, { from: exportFrom, to: exportTo, usine: 'SBM Tunisie' })
+    if (weeks === 0) toast.info('Aucune donnée', 'Aucune inspection sur cet intervalle.')
+    else toast.success('Export généré', `${intervalRecords.length} inspection(s) sur ${weeks} semaine(s).`)
   }
 
   return (
@@ -105,6 +121,29 @@ export function ImportExport() {
           <Button variant="primary" className="cursor-pointer bg-green-500" onClick={handleExport}>
             <Download className="h-4 w-4" /> Exporter en Excel
           </Button>
+
+          <div className="mt-2 border-t border-[--color-graphite-100] pt-4">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[--color-graphite-500]">
+              <CalendarRange className="h-3.5 w-3.5" /> Exporter une période
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[--color-graphite-500]">Du</label>
+                <input type="date" value={exportFrom} onChange={(e) => setExportFrom(e.target.value)} className="w-full rounded-lg border border-[--color-graphite-200] px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[--color-graphite-500]">Au</label>
+                <input type="date" value={exportTo} onChange={(e) => setExportTo(e.target.value)} className="w-full rounded-lg border border-[--color-graphite-200] px-3 py-2 text-sm" />
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-[--color-graphite-500]">Une feuille par semaine sur l’intervalle, au format de la fiche papier.</p>
+            <div className="mt-2 flex items-center gap-3">
+              <Badge>{intervalRecords.length} inspection(s)</Badge>
+              <Button variant="primary" className="cursor-pointer" onClick={handleIntervalExport}>
+                <Download className="h-4 w-4" /> Exporter la période
+              </Button>
+            </div>
+          </div>
         </div>
       </Card>
     </div>

@@ -162,6 +162,51 @@ export function downloadWeekExport(records: InspectionRecord[], options: ExportO
   XLSX.writeFile(wb, filename)
 }
 
+/**
+ * Exports every week that overlaps the [from, to] interval as one workbook,
+ * one paper-form sheet per week. Returns the number of weeks written (0 = empty).
+ */
+export function downloadIntervalExport(
+  records: InspectionRecord[],
+  options: { from: string; to: string; usine: string },
+): number {
+  const firstWeek = startOfWeek(parseISO(options.from), { weekStartsOn: 1 })
+  const lastWeek = startOfWeek(parseISO(options.to), { weekStartsOn: 1 })
+
+  const combined = XLSX.utils.book_new()
+  const usedNames = new Set<string>()
+  let weekStart = firstWeek
+  let weeks = 0
+
+  while (weekStart.getTime() <= lastWeek.getTime()) {
+    const weekStartStr = format(weekStart, 'yyyy-MM-dd')
+    const weekEnd = addDays(weekStart, 6)
+    const weekRecords = records.filter((r) => {
+      const d = parseISO(r.date)
+      return d.getTime() >= weekStart.getTime() && d.getTime() <= weekEnd.getTime()
+    })
+
+    const weekWb = exportWeekToWorkbook(weekRecords, { weekStartDate: weekStartStr, usine: options.usine })
+    const sheet = weekWb.Sheets[weekWb.SheetNames[0]]
+
+    // Sheet names: unique and ≤ 31 chars (Excel limit).
+    let name = `S${format(weekStart, 'ww')} ${format(weekStart, 'dd-MM')}`.slice(0, 31)
+    const base = name.slice(0, 27)
+    let i = 1
+    while (usedNames.has(name)) name = `${base}_${i++}`
+    usedNames.add(name)
+
+    XLSX.utils.book_append_sheet(combined, sheet, name)
+    weekStart = addDays(weekStart, 7)
+    weeks++
+  }
+
+  if (weeks === 0) return 0
+  const filename = `Fiches_Controle_${options.from}_au_${options.to}.xlsx`
+  XLSX.writeFile(combined, filename)
+  return weeks
+}
+
 // ---------------------------------------------------------------------------
 // IMPORT
 // ---------------------------------------------------------------------------
