@@ -1,4 +1,4 @@
-import { Factory, PanelLeftClose, PanelLeftOpen, Settings, LogOut } from 'lucide-react'
+import {PanelLeftClose, PanelLeftOpen, Settings, LogOut } from 'lucide-react'
 
 export interface NavItem {
   id: string
