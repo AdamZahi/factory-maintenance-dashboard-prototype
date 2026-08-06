@@ -207,7 +207,7 @@ function AuthenticatedApp() {
                 <Menu className="h-5 w-5" />
               </button>
               <div className='min-w-0'>
-                <img src="/public/images/logo-sbm.jpg" alt="SBM Tunisie" className="h-11 w-39" />
+                <img src="/images/logo-sbm.jpg" alt="SBM Tunisie" className="h-11 w-39" />
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-[--color-graphite-400]">SBM Tunisie · Maintenance</p>

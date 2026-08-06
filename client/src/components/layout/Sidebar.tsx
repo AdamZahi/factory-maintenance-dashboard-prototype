@@ -56,7 +56,7 @@ export function Sidebar({
         <div className="flex items-center gap-3 rounded-2xl bg-[--color-graphite-50] px-3 py-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[--color-amber-signal] text-black shadow-sm">
             {/* <Factory className="h-5 w-5" /> */}
-            <img src="/public/images/sbm_logo.jpg" alt="SBM Tunisie" className="h-11 w-11" />
+            <img src="/images/sbm_logo.jpg" alt="SBM Tunisie" className="h-11 w-11" />
           </div>
           <div className={`min-w-0 flex-1 overflow-hidden transition-opacity duration-200 ${collapsed ? 'lg:w-0 lg:opacity-0' : 'opacity-100'}`}>
             <p className="truncate font-display text-base font-semibold uppercase tracking-[0.12em] text-[--color-graphite-900]">SBM Tunisie</p>
