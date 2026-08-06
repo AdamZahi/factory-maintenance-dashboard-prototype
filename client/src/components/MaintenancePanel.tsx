@@ -116,7 +116,7 @@ export function MaintenancePanel({ canManage = false }: { canManage?: boolean })
               {summary.due_soon > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-[--color-status-warning-bg] px-2.5 py-1 font-medium text-[--color-status-warning]"><AlertTriangle className="h-3.5 w-3.5" />{summary.due_soon} bientôt</span>}
               {summary.overdue === 0 && summary.due_soon === 0 && !loading && <span className="inline-flex items-center gap-1 rounded-full bg-[--color-status-normal-bg] px-2.5 py-1 font-medium text-[--color-status-normal]"><CheckCircle2 className="h-3.5 w-3.5" />Tout à jour</span>}
               {canManage && availableEquipment.length > 0 && (
-                <Button size="sm" variant="primary" onClick={() => setEditing('new')}><Plus className="h-3.5 w-3.5" /> Nouvelle échéance</Button>
+                <Button size="sm" variant="primary" className="bg-gray-500" onClick={() => setEditing('new')}><Plus className="h-3.5 w-3.5" /> Nouvelle échéance</Button>
               )}
             </div>
           }
@@ -278,7 +278,7 @@ function ScheduleFormModal({
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Annuler</Button>
-          <Button variant="primary" disabled={saving} onClick={save}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Enregistrer</Button>
+          <Button variant="primary" className="bg-green-500" disabled={saving} onClick={save}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Enregistrer</Button>
         </>
       }
     >
