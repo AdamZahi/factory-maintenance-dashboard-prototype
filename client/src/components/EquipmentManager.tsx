@@ -133,7 +133,7 @@ export function EquipmentManager({ canManage = false }: { canManage?: boolean })
           subtitle="Créez et configurez les équipements suivis et leurs paramètres de contrôle"
           action={
             canManage ? (
-              <Button size="sm" variant="primary" onClick={() => setEditing('new')}>
+              <Button size="sm" variant="primary" className="flex items-center gap-2 bg-gray-600" onClick={() => setEditing('new')}>
                 <Plus className="h-3.5 w-3.5" /> Nouvel équipement
               </Button>
             ) : undefined
@@ -296,7 +296,7 @@ function EquipmentFormModal({
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Annuler</Button>
-          <Button variant="primary" disabled={saving} onClick={save}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Enregistrer</Button>
+          <Button variant="primary" className='bg-green-500' disabled={saving} onClick={save}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Enregistrer</Button>
         </>
       }
     >
