@@ -11,7 +11,7 @@ import { Sidebar, type NavItem } from './components/layout/Sidebar'
 import { SettingsPanel } from './components/SettingsPanel'
 import { NotificationBell } from './components/NotificationBell'
 import { MaintenancePanel } from './components/MaintenancePanel'
-import { MonitoringPage } from './components/MonitoringPage'
+import { SupervisionWall } from './components/SupervisionWall'
 import { EquipmentManager } from './components/EquipmentManager'
 import { UserManagement } from './components/UserManagement'
 import { ToastProvider } from './components/ui/Toast'
@@ -179,6 +179,9 @@ function AuthenticatedApp() {
   }
 
   const pageTitle = selectedEquipmentId ? 'Détails du paramètre' : TAB_TITLES[tab]
+  // The Supervision wall fills the viewport exactly and must never scroll, so it
+  // gets a full-height, unpadded, overflow-hidden main instead of the scrolling one.
+  const isWall = !selectedEquipmentId && tab === 'monitoring'
 
   return (
     <div className="flex h-dvh overflow-hidden bg-[--color-graphite-50]">
@@ -207,7 +210,7 @@ function AuthenticatedApp() {
                 <Menu className="h-5 w-5" />
               </button>
               <div className='min-w-0'>
-                <img src="/images/logo-sbm.jpg" alt="SBM Tunisie" className="h-11 w-39" />
+                <img src="/images/logo-sbm.png" alt="SBM Tunisie" className="h-11 w-39" />
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-[--color-graphite-400]">SBM Tunisie · Maintenance</p>
@@ -229,14 +232,14 @@ function AuthenticatedApp() {
           </div>
         </header>
 
-        <main key={selectedEquipmentId ?? tab} className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
-          <div className="animate-fade-in-up">
+        <main key={selectedEquipmentId ?? tab} className={`min-h-0 flex-1 ${isWall ? 'overflow-hidden p-2 sm:p-3' : 'overflow-y-auto px-4 py-6 sm:px-6'}`}>
+          <div className={isWall ? 'h-full' : 'animate-fade-in-up'}>
             {selectedEquipmentId ? (
               <EquipmentParametersDetails equipmentId={selectedEquipmentId} inspections={inspections} onBack={closeEquipmentDetails} />
             ) : tab === 'dashboard' ? (
               <Dashboard inspections={inspections} onSelectEquipment={openEquipmentDetails} />
             ) : tab === 'monitoring' ? (
-              <MonitoringPage />
+              <SupervisionWall />
             ) : tab === 'inspection' ? (
               <InspectionForm role={isAdmin ? 'admin' : 'technician'} />
             ) : tab === 'history' ? (
